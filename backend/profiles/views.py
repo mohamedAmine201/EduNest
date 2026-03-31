@@ -24,7 +24,7 @@ class ProfileListAPIView(APIView):
             qs = Course.objects.select_related(
                 'teacher__user',
                 'semester__speciality_year'
-            )
+            ).filter(teacher__isnull=False)
             if year:
                 qs = qs.filter(semester__speciality_year__year=year)
             if speciality:

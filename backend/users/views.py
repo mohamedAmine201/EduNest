@@ -56,7 +56,7 @@ class RegisterView(APIView):
             user = User.objects.create_user(
                 username=username, password=password, email=email,
                 first_name=prenom, last_name=nom,
-                role=role, bio=role.capitalize()
+                role=role.upper(), bio=role.capitalize()
             )
             teacher = TeacherProfile.objects.create(user=user)
             course_obj.teacher = teacher

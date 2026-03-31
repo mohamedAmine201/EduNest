@@ -71,7 +71,7 @@ export function EditTeacherForm({ onClose, person }: Props) {
 
     const handleDelete = async () => {
         try {
-            const res = await fetch(`${BASE_URL}/api/users/${person.id}/delete/`, {
+            const res = await fetch(`${BASE_URL}/api/users/${person.user_id}/delete/`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Token ${token}` }
             })

@@ -95,7 +95,7 @@ const HeadProfile = () => {
   fetchPeople()
   }, [selectedRole, selectedYear, selectedSpeciality])
 
-  const filtered = people  // backend already filtered, no need to filter again
+  const filtered = people 
 
   // ------------------------------------------------------------------
   // Step 1 — Upload file
