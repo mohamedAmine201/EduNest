@@ -1,7 +1,7 @@
 import React from 'react'
 import {Link} from 'react-router-dom'
 import logo from '../assets/logoIEC.png'
-import { NavigationMenuDemo, LoginLink } from './NavigationMenu'
+import { NavigationMenuBar, LoginLink } from './NavigationMenu'
 
 const Navbar = () => {
   return (
@@ -10,7 +10,7 @@ const Navbar = () => {
           <Link to='/'>
           <img src={logo} className='mr-2'/>
           </Link>
-          <NavigationMenuDemo />
+          <NavigationMenuBar />
         </div>
         <div>
           <LoginLink />

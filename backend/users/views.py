@@ -15,52 +15,74 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        nom    = request.data.get('nom')
-        prenom = request.data.get('prenom')
+        nom          = request.data.get('nom')
+        prenom       = request.data.get('prenom')
+        email        = request.data.get('email')
+        identifier   = request.data.get('identifier')
+        phone_number = request.data.get('phone_number') or None
+        role         = request.data.get('role', 'STUDENT').upper()  # normalize
+        current_year = datetime.now().year
+
         prenom_clean = prenom.lower().strip().replace(" ", "_")
         nom_clean    = nom.lower().strip().replace(" ", "_")
         username     = f"{prenom_clean}.{nom_clean}"
-        email        = request.data.get('email')
-        role         = request.data.get('role', 'student')
-        current_year = datetime.now().year
 
-        if role == 'student':
+        if role == 'STUDENT':
             from specialities.models import SpecialityYear
-            matricule  = request.data.get('matricule')
             year       = request.data.get('year')
             speciality = request.data.get('speciality')
             password   = f"{speciality}{current_year}"
 
             try:
-                speciality_year_obj = SpecialityYear.objects.get(year=year, speciality=speciality)
+                speciality_year_obj = SpecialityYear.objects.get(
+                    year=year, speciality=speciality
+                )
             except SpecialityYear.DoesNotExist:
                 return Response({"detail": "Speciality/year not found"}, status=404)
 
             user = User.objects.create_user(
-                username=username, password=password, email=email,
-                first_name=prenom, last_name=nom,
-                role=role.upper(), bio=f"{speciality} {role.capitalize()}"
+                identifier=identifier, username=username, password=password,
+                email=email, first_name=prenom, last_name=nom,
+                phone_number=phone_number, role='STUDENT',
+                bio=f"{speciality} Student",
             )
-            StudentProfile.objects.create(user=user, matricule=matricule, speciality_year=speciality_year_obj)
+            StudentProfile.objects.create(user=user, speciality_year=speciality_year_obj)
 
-        else:
+        elif role == 'TEACHER':
             from courses.models import Course
-            course   = request.data.get('course')
-            password = str(current_year)
-
-            try:
-                course_obj = Course.objects.get(name=course)
-            except Course.DoesNotExist:
-                return Response({"detail": "Course not found"}, status=404)
+            courses_raw = request.data.get('courses') or None
+            password    = str(current_year)
 
             user = User.objects.create_user(
-                username=username, password=password, email=email,
-                first_name=prenom, last_name=nom,
-                role=role.upper(), bio=role.capitalize()
+                identifier=identifier, username=username, password=password,
+                email=email, first_name=prenom, last_name=nom,
+                phone_number=phone_number, role='TEACHER',
+                bio="Teacher",
             )
             teacher = TeacherProfile.objects.create(user=user)
-            course_obj.teacher = teacher
-            course_obj.save()
+
+            if courses_raw:
+                names = [c.strip() for c in courses_raw.split(',') if c.strip()]
+
+                found, missing = [], []
+                for name in names:
+                    try:
+                        found.append(Course.objects.get(name=name))
+                    except Course.DoesNotExist:
+                        missing.append(name)
+
+                if missing:
+                    # Roll back the user we just created
+                    user.delete()
+                    return Response(
+                        {"detail": f"Courses not found: {', '.join(missing)}"},
+                        status=404,
+                    )
+
+                teacher.courses.set(found)
+
+        else:
+            return Response({"detail": f"Invalid role: {role}"}, status=400)
 
         return Response({"detail": "User created successfully"}, status=201)
 
@@ -100,45 +122,76 @@ class UpdateUserView(APIView):
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"detail": "User not found"}, status=404)
-        # Update user fields
-        user.first_name = request.data.get('prenom', user.first_name)
-        user.last_name = request.data.get('nom', user.last_name)
+
+        # ── User-level fields ──────────────────────────────────────────────
+        user.first_name  = request.data.get('prenom', user.first_name)
+        user.last_name   = request.data.get('nom', user.last_name)
+        identifier = request.data.get('identifier')
+        if User.objects.filter(identifier=identifier).exclude(pk=user.id).exists():
+            return Response({"detail": "Identifier already in use"}, status=400)
+        user.identifier  = request.data.get('identifier', user.identifier)
+        user.phone_number = request.data.get('phone_number', user.phone_number) or None
+
         new_email = request.data.get('email', user.email)
         if new_email != user.email:
             if User.objects.filter(email=new_email).exclude(pk=user.id).exists():
                 return Response({"detail": "Email already in use"}, status=400)
-            user.email = new_email
+            user.email    = new_email
+            user.username = new_email   # keep username in sync if you use email as username
+
         user.save()
 
-        # Update profile fields 
-        role = user.role 
-        if role == 'STUDENT':
+        # ── Profile fields ─────────────────────────────────────────────────
+        if user.role == 'STUDENT':
             profile = user.student_profile
-            profile.matricule = request.data.get('matricule', profile.matricule)
-            year       = request.data.get('year', None)
-            speciality = request.data.get('speciality', None)
+            year       = request.data.get('year')       or None
+            speciality = request.data.get('speciality') or None
+
             if year or speciality:
                 from specialities.models import SpecialityYear
                 try:
                     profile.speciality_year = SpecialityYear.objects.get(
-                        year=year or profile.speciality_year.year,
-                        speciality=speciality or profile.speciality_year.speciality
+                        year=year             or profile.speciality_year.year,
+                        speciality=speciality or profile.speciality_year.speciality,
                     )
                 except SpecialityYear.DoesNotExist:
-                    return Response({"detail": "Speciality/year not found"}, status=404)
-            profile.save()
-        else:
-            profile = user.teacher_profile
-            course = request.data.get('course', None)
-            if course:
-                from courses.models import Course
-                try:
-                    course_obj = Course.objects.get(name=course)
-                    course_obj.teacher = profile
-                    course_obj.save()
-                except Course.DoesNotExist:
-                    return Response({"detail": "Course not found"}, status=404)
+                    return Response({"detail": "Speciality/year combination not found"}, status=404)
 
+            profile.save()
+
+        elif user.role == 'TEACHER':
+            profile = user.teacher_profile
+
+            # Use a sentinel to detect "field was not sent at all"
+            MISSING = object()
+            courses_raw = request.data.get('courses', MISSING)
+
+            if courses_raw is not MISSING:
+                # Field was explicitly sent (even if empty)
+                if not courses_raw or not courses_raw.strip():
+                    # Empty string → remove all courses
+                    profile.courses.clear()
+                else:
+                    from courses.models import Course
+                    names = [c.strip() for c in courses_raw.split(',') if c.strip()]
+
+                    found, missing = [], []
+                    for name in names:
+                        try:
+                            found.append(Course.objects.get(name=name))
+                        except Course.DoesNotExist:
+                            missing.append(name)
+
+                    if missing:
+                        return Response(
+                            {"detail": f"Courses not found: {', '.join(missing)}"},
+                            status=404,
+                        )
+
+                    # set() handles both additions and removals in one call
+                    profile.courses.set(found)
+
+            profile.save()
         return Response({"detail": "User updated successfully"}, status=200)
 
 
@@ -152,26 +205,26 @@ class DeleteUserView(APIView):
         user.delete()
         return Response({"detail": "User deleted successfully"}, status=200)
 
+
 import pandas as pd
 from django.db import transaction
 from .utils import smart_detect_columns
 from specialities.models import SpecialityYear
 
+REQUIRED_FIELDS = ["identifier", "nom", "prenom", "email"]
 
 class SpreadsheetUploadView(APIView):
-    """Step 1 — Upload file, detect columns, return preview."""
     def post(self, request):
         file = request.FILES.get("file")
         if not file:
-            return Response({"error": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response({"error": "No file provided."}, status=400)
         try:
-            if file.name.endswith(".xlsx") or file.name.endswith(".xls"):
+            if file.name.endswith((".xlsx", ".xls")):
                 df = pd.read_excel(file)
             else:
                 df = pd.read_csv(file)
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(e)}, status=400)
 
         df.dropna(how="all", inplace=True)
         df = df.where(pd.notnull(df), None)
@@ -181,120 +234,106 @@ class SpreadsheetUploadView(APIView):
 
         return Response({
             "detected_columns": detected,
-            "headers": headers,
-            "preview": df.head(5).to_dict(orient="records"),
-            "total_rows": len(df),
-            "rows": df.to_dict(orient="records"),
+            "headers":          headers,
+            "preview":          df.head(5).to_dict(orient="records"),
+            "total_rows":       len(df),
+            "rows":             df.to_dict(orient="records"),
         })
 
 
 class BulkImportView(APIView):
-    """Step 2 — Confirm mapping, create Users + profiles."""
     def post(self, request):
-        mapping      = request.data.get("mapping", {})
-        rows         = request.data.get("rows", [])
-        role         = request.data.get("role", "student")   # "student" | "teacher"
-        speciality   = request.data.get("speciality", "DSIA")
-        academic_year = request.data.get("academic_year") 
-        current_year = request.data.get("current_year", "2026")
-
-        # --- Validate required fields based on role ---
-        if role == "student":
-            required = ["matricule", "nom", "prenom", "email"]
-        else:
-            required = ["course", "nom", "prenom", "email"]
-
-        missing = [f for f in required if f not in mapping]
-        if missing:
-            return Response(
-                {"error": f"Missing column mappings: {missing}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        
-        # --- Fetch SpecialityYear once before the loop (for students) ---
-        speciality_year_obj = None
-        if role == "student":
-            try:
-                speciality_year_obj = SpecialityYear.objects.get(
-                    year=academic_year,
-                    speciality=speciality
-                )
-            except SpecialityYear.DoesNotExist:
-                return Response(
-                    {"error": f"No SpecialityYear found for year {academic_year} and speciality {speciality}"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        # --- Fetch valid courses from DB once (for teachers) ---
-        valid_courses = {}
-        if role == "teacher":
-            valid_courses = {
-                c.name.lower(): c for c in Course.objects.all()
-            }  # { "math": <Course>, "physics": <Course>, ... }
+        mapping       = request.data.get("mapping", {})
+        rows          = request.data.get("rows", [])
+        role          = request.data.get("role", "").upper()       # "STUDENT" or "TEACHER"
+        speciality    = request.data.get("speciality") or None
+        current_year  = request.data.get("current_year") or None
+        year = request.data.get("year") or None
 
         created, skipped, errors = [], [], []
 
         for row in rows:
             try:
-                with transaction.atomic():
-                    nom    = str(row[mapping["nom"]]).strip()
-                    prenom = str(row[mapping["prenom"]]).strip()
-                    prenom_clean = prenom.lower().strip().replace(" ", "_")
-                    nom_clean    = nom.lower().strip().replace(" ", "_")
-                    email  = str(row[mapping["email"]]).strip()
+                identifier = row.get(mapping.get("identifier"))
+                nom        = row.get(mapping.get("nom"))
+                prenom     = row.get(mapping.get("prenom"))
+                email      = row.get(mapping.get("email"))
+                phone      = row.get(mapping.get("phone_number")) if mapping.get("phone_number") else None
+                course     = row.get(mapping.get("course")) if mapping.get("course") else None
 
-                    username     = f"{prenom_clean}.{nom_clean}"
+                if not email:
+                    skipped.append({"email": "—", "reason": "Missing email"})
+                    continue
+                if User.objects.filter(email=email).exists():
+                    skipped.append({"email": email, "reason": "Already exists"})
+                    continue
 
-                    if User.objects.filter(email=email).exists():
-                        skipped.append({"email": email, "reason": "Email already exists"})
-                        continue
 
-                    if User.objects.filter(username=username).exists():
-                        username = f"{username}.{nom.lower()}"
+                if role == "STUDENT":
+                    password = f"{speciality}{current_year}"
+                    try:
+                        speciality_year_obj = SpecialityYear.objects.get(year=year, speciality=speciality)
+                    except SpecialityYear.DoesNotExist:
+                        return Response({"detail": "Speciality/year not found"}, status=404)
 
-                    if role == "student":
-                        matricule = str(row[mapping["matricule"]]).strip()
-                        password = f"{speciality}{current_year}"
+                    user = User.objects.create_user(
+                    username=email,
+                    first_name=prenom,
+                    last_name=nom,
+                    email=email,
+                    password=password,
+                    role=role,
+                    identifier=identifier,
+                    phone_number=phone,
+                    )
+                    StudentProfile.objects.create(
+                        user=user,
+                        speciality_year=speciality_year_obj
+                    )
 
-                        user = User.objects.create_user(
-                            username=username,
-                            email=email,
-                            password=password,
-                            first_name=prenom,
-                            last_name=nom,
-                            role=role.upper(),
-                            bio=f"{speciality} {role.capitalize()}"
-                        )
-                        profile = StudentProfile.objects.create(user=user, matricule=matricule, speciality_year=speciality_year_obj)
-                        created.append(StudentSerializer(profile).data)
+                elif role == "TEACHER":
+                    password = current_year
+                    user = User.objects.create_user(
+                    username=email,
+                    first_name=prenom,
+                    last_name=nom,
+                    email=email,
+                    password=password,
+                    role=role,
+                    identifier=identifier,
+                    phone_number=phone,
+                    )
+                    profile = TeacherProfile.objects.create(
+                        user=user,
+                        nom=nom,
+                        prenom=prenom,
+                    )
 
-                    else:  # teacher
-                        course_name = str(row[mapping["course"]]).strip()
-                        password = current_year
-
-                        course_obj = valid_courses.get(course_name.lower())
-                        if not course_obj:
+                    if course:
+                        course_names = [c.strip() for c in str(course).split(",") if c.strip()]
+                        
+                        # Validate all courses exist
+                        invalid = []
+                        course_objects = []
+                        for name in course_names:
+                            try:
+                                course_obj = Course.objects.get(name__iexact=name)
+                                course_objects.append(course_obj)
+                            except Course.DoesNotExist:
+                                invalid.append(name)
+                        
+                        if invalid:
+                            # Roll back the user we just created and skip
+                            user.delete()
                             skipped.append({
                                 "email": email,
-                                "reason": f"Course '{course_name}' not found in database"
+                                "reason": f"Unknown course(s): {', '.join(invalid)}"
                             })
                             continue
+                        
+                        profile.courses.set(course_objects)
 
-                        user = User.objects.create_user(
-                            username=username,
-                            email=email,
-                            password=password,
-                            first_name=prenom,
-                            last_name=nom,
-                            role=role.upper(),
-                            bio=role.capitalize()
-                        )
-                        profile = TeacherProfile.objects.create(user=user)
-
-                        course_obj.teacher = profile
-                        course_obj.save()
-
-                        created.append(TeacherSerializer(profile).data)
+                created.append(email)
 
             except Exception as e:
                 errors.append({"row": row, "error": str(e)})
@@ -302,6 +341,6 @@ class BulkImportView(APIView):
         return Response({
             "created": len(created),
             "skipped": len(skipped),
-            "errors": len(errors),
+            "errors":  len(errors),
             "details": {"created": created, "skipped": skipped, "errors": errors},
-        }, status=status.HTTP_201_CREATED)
+        })

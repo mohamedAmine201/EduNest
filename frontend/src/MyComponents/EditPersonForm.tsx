@@ -7,22 +7,44 @@ import { toast } from "sonner"
 import * as z from "zod"
 import { useAuth } from "./AuthContext"
 import {
-  User, Mail, Phone, BookOpen, GraduationCap, Hash, Save,
-  X, ChevronDown, Search, Loader2,
+  Trash2, Save, User, Mail, Phone, BookOpen,
+  GraduationCap, Hash, X, ChevronDown, Search, Loader2,
 } from "lucide-react"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const BASE_URL = import.meta.env.VITE_API_URL
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type PersonForEdit = {
+  user_id:      number
+  identifier:   string | null
+  nom:          string
+  prenom:       string
+  email:        string
+  phone_number: string | null
+  role:         string
+  year:         string | null
+  speciality:   string | null
+  courses:      string | null   // comma-separated course names
+}
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const schema = z.object({
-  identifier:   z.string().min(2, "At least 2 characters").max(50),
-  nom:          z.string().min(2, "At least 2 characters").max(30),
-  prenom:       z.string().min(2, "At least 2 characters").max(30),
+  identifier:   z.string().min(1, "Required").max(50),
+  nom:          z.string().min(1, "Required").max(30),
+  prenom:       z.string().min(1, "Required").max(30),
   email:        z.string().email("Invalid email").max(100),
   phone_number: z.string().max(20).optional().or(z.literal("")),
   year:         z.string().optional().or(z.literal("")),
   speciality:   z.string().optional().or(z.literal("")),
+  // stored as array in the form, serialized to comma-string on submit
   courses:      z.array(z.string()).optional(),
 })
 
@@ -30,12 +52,10 @@ type FormValues = z.infer<typeof schema>
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
-type CreatePersonFormProps = {
-  onClose?:    () => void
-  onCreated?:  () => void
-  role?:       "student" | "teacher"
-  year?:       string
-  speciality?: string
+interface Props {
+  person:   PersonForEdit
+  onClose?: () => void
+  onSaved?: () => void
 }
 
 // ─── FieldRow ─────────────────────────────────────────────────────────────────
@@ -46,7 +66,7 @@ function FieldRow({
   icon: React.ElementType; label: string; required?: boolean; error?: string; children: React.ReactNode
 }) {
   return (
-    <div>
+    <div className="group">
       <div className="flex items-center gap-2 mb-1.5">
         <Icon className="w-3.5 h-3.5 text-zinc-400" />
         <label className="text-xs font-semibold tracking-wide uppercase text-zinc-500">
@@ -65,18 +85,6 @@ function FieldRow({
   )
 }
 
-// ─── Input style ──────────────────────────────────────────────────────────────
-
-function inputCls(invalid: boolean) {
-  return [
-    "w-full h-9 rounded-lg border bg-zinc-50 dark:bg-zinc-800/60 px-3 text-sm",
-    "focus:outline-none focus:ring-2 transition-all duration-150",
-    invalid
-      ? "border-rose-400 focus:ring-rose-400/30"
-      : "border-zinc-200 dark:border-zinc-700 focus:ring-blue-500/30 focus:border-blue-400",
-  ].join(" ")
-}
-
 // ─── CourseMultiSelect ────────────────────────────────────────────────────────
 
 interface CourseMultiSelectProps {
@@ -86,23 +94,23 @@ interface CourseMultiSelectProps {
 
 function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
   const { token } = useAuth()
-  const [open, setOpen]       = React.useState(false)
-  const [query, setQuery]     = React.useState("")
-  const [options, setOptions] = React.useState<string[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const containerRef          = React.useRef<HTMLDivElement>(null)
-  const inputRef              = React.useRef<HTMLInputElement>(null)
+  const [open, setOpen]         = React.useState(false)
+  const [query, setQuery]       = React.useState("")
+  const [options, setOptions]   = React.useState<string[]>([])
+  const [loading, setLoading]   = React.useState(false)
+  const containerRef            = React.useRef<HTMLDivElement>(null)
+  const inputRef                = React.useRef<HTMLInputElement>(null)
 
+  // Fetch matching courses from DB whenever query changes
   React.useEffect(() => {
-    const controller = new AbortController()
     if (!open) return
+
+    const controller = new AbortController()
+
     const run = async () => {
       setLoading(true)
       try {
-        const url = query.trim()
-          ? `${BASE_URL}/api/courses/?search=${encodeURIComponent(query)}`
-          : `${BASE_URL}/api/courses/`
-        const res = await fetch(url, {
+        const res = await fetch(`${BASE_URL}/api/courses/`, {
           headers: { Authorization: `Token ${token}` },
           signal: controller.signal,
         })
@@ -116,10 +124,12 @@ function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
         setLoading(false)
       }
     }
-    const tid = setTimeout(run, 200)
-    return () => { clearTimeout(tid); controller.abort() }
-  }, [query, open, token])
 
+    run()
+    return () => controller.abort()
+  }, [open, token])
+
+  // Close on outside click
   React.useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -132,7 +142,11 @@ function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
   }, [])
 
   const toggle = (course: string) => {
-    onChange(value.includes(course) ? value.filter(c => c !== course) : [...value, course])
+    onChange(
+      value.includes(course)
+        ? value.filter(c => c !== course)
+        : [...value, course]
+    )
   }
 
   const remove = (course: string, e: React.MouseEvent) => {
@@ -145,12 +159,14 @@ function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
     setTimeout(() => inputRef.current?.focus(), 10)
   }
 
+  // Filtered: show all fetched options (DB already filters by query)
   const filtered = options.filter(o =>
-    !value.includes(o) && o.toLowerCase().includes(query.toLowerCase())
+    !value.includes(o) &&
+    o.toLowerCase().includes(query.toLowerCase())
   )
-
   return (
     <div ref={containerRef} className="relative">
+      {/* Trigger box */}
       <div
         onClick={openDropdown}
         className={[
@@ -161,6 +177,7 @@ function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
             : "border-zinc-200 dark:border-zinc-700",
         ].join(" ")}
       >
+        {/* Badges */}
         {value.map(course => (
           <span
             key={course}
@@ -178,6 +195,7 @@ function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
           </span>
         ))}
 
+        {/* Inline search input (visible when open) */}
         {open ? (
           <input
             ref={inputRef}
@@ -200,8 +218,10 @@ function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
         )}
       </div>
 
+      {/* Dropdown */}
       {open && (
         <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-xl overflow-hidden">
+          {/* Search header */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-100 dark:border-zinc-800">
             <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <span className="text-xs text-zinc-400">
@@ -209,6 +229,8 @@ function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
             </span>
             {loading && <Loader2 className="w-3 h-3 text-zinc-400 animate-spin ml-auto" />}
           </div>
+
+          {/* Options list */}
           <ul className="max-h-48 overflow-y-auto py-1">
             {filtered.length === 0 && !loading && (
               <li className="px-3 py-2 text-xs text-zinc-400 italic">
@@ -227,6 +249,7 @@ function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
                 </button>
               </li>
             ))}
+            {/* Also show already-selected at bottom, dimmed */}
             {value.length > 0 && filtered.length > 0 && (
               <li className="px-3 pt-1 pb-0.5 border-t border-zinc-100 dark:border-zinc-800">
                 <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-semibold">Selected</span>
@@ -252,124 +275,125 @@ function CourseMultiSelect({ value, onChange }: CourseMultiSelectProps) {
   )
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 
-export function CreatePersonForm({
-  onClose, onCreated,
-  role: initialRole,
-  year: preYear = "",
-  speciality: preSpeciality = "",
-}: CreatePersonFormProps) {
+export function EditPersonForm({ person, onClose, onSaved }: Props) {
   const { token } = useAuth()
-  const [selectedRole, setSelectedRole] = React.useState<"student" | "teacher">(
-    initialRole ?? "student"
-  )
-  const isStudent = selectedRole === "student"
+  const isStudent = person.role === "STUDENT"
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      identifier:   "",
-      nom:          "",
-      prenom:       "",
-      email:        "",
-      phone_number: "",
-      year:         preYear,
-      speciality:   preSpeciality,
-      courses:      [],
+      identifier:   person.identifier   ?? "",
+      nom:          person.nom,
+      prenom:       person.prenom,
+      email:        person.email,
+      phone_number: person.phone_number ?? "",
+      year:         person.year ? String(person.year) : "",
+      speciality:   person.speciality   ?? "",
+      // parse comma-string → array, drop empties
+      courses: person.courses
+        ? person.courses.split(",").map(s => s.trim()).filter(Boolean)
+        : [],
     },
   })
 
   const { formState: { isSubmitting } } = form
 
-  function handleRoleToggle(role: "student" | "teacher") {
-    setSelectedRole(role)
-    if (role === "student") {
-      form.setValue("year",      preYear)
-      form.setValue("speciality", preSpeciality)
-      form.setValue("courses",   [])
-    } else {
-      form.setValue("year",      "")
-      form.setValue("speciality", "")
-      form.setValue("courses",   [])
-    }
-  }
-
+  // ── Submit ─────────────────────────────────────────────────────────────────
   async function onSubmit(values: FormValues) {
-    const payload: Record<string, unknown> = {
-      identifier:   values.identifier,
-      nom:          values.nom,
-      prenom:       values.prenom,
-      email:        values.email,
-      phone_number: values.phone_number || null,
-      role:         selectedRole.toUpperCase(),
-    }
-    if (isStudent) {
-      payload.year       = values.year       || null
-      payload.speciality = values.speciality || null
-    } else {
-      payload.courses = values.courses?.join(", ") || null
-    }
     try {
-      const res = await fetch(`${BASE_URL}/api/users/register/`, {
-        method:  "POST",
+      const payload: Record<string, unknown> = {
+        identifier:   values.identifier,
+        nom:          values.nom,
+        prenom:       values.prenom,
+        email:        values.email,
+        phone_number: values.phone_number || null,
+      }
+      if (isStudent) {
+        payload.year       = values.year       || null
+        payload.speciality = values.speciality || null
+      } else {
+        // serialize back to comma-string for the backend
+        payload.courses = values.courses?.join(", ") || null
+      }
+
+      const res = await fetch(`${BASE_URL}/api/users/${person.user_id}/update/`, {
+        method:  "PATCH",
         headers: { Authorization: `Token ${token}`, "Content-Type": "application/json" },
         body:    JSON.stringify(payload),
       })
       if (!res.ok) {
         const err = await res.json()
-        toast.error(err.detail || "Something went wrong", { position: "bottom-right" })
+        toast.error(err.detail || "Update failed", { position: "bottom-right" })
         return
       }
-      toast.success(
-        `${isStudent ? "Student" : "Teacher"} created successfully!`,
-        { position: "bottom-right" }
-      )
-      onCreated?.()
+      toast.success("Saved successfully", { position: "bottom-right" })
+      onSaved?.()
       onClose?.()
     } catch {
-      toast.error("Network error, please try again", { position: "bottom-right" })
+      toast.error("Network error", { position: "bottom-right" })
     }
   }
+
+  // ── Delete ─────────────────────────────────────────────────────────────────
+  async function handleDelete() {
+    try {
+      const res = await fetch(`${BASE_URL}/api/users/${person.user_id}/delete/`, {
+        method:  "DELETE",
+        headers: { Authorization: `Token ${token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        toast.error(err.detail || "Delete failed", { position: "bottom-right" })
+        return
+      }
+      toast.success("User deleted", { position: "bottom-right" })
+      onSaved?.()
+      onClose?.()
+    } catch {
+      toast.error("Network error", { position: "bottom-right" })
+    }
+  }
+
+  const inputCls = (invalid: boolean) =>
+    [
+      "w-full h-9 rounded-lg border bg-zinc-50 dark:bg-zinc-800/60 px-3 text-sm",
+      "focus:outline-none focus:ring-2 transition-all duration-150",
+      invalid
+        ? "border-rose-400 focus:ring-rose-400/30"
+        : "border-zinc-200 dark:border-zinc-700 focus:ring-blue-500/30 focus:border-blue-400",
+    ].join(" ")
 
   return (
     <div className="w-full space-y-5">
 
       {/* Header */}
-      <div>
-        <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-          Create new user
-        </h2>
-        <p className="text-xs text-zinc-400 mt-0.5">
-          Fill in the details below. Fields marked <span className="text-rose-400">*</span> are required.
-        </p>
-      </div>
-
-      {/* Role toggle */}
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 w-fit">
-        {(["student", "teacher"] as const).map(role => (
-          <button
-            key={role}
-            type="button"
-            onClick={() => handleRoleToggle(role)}
-            className={[
-              "px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide uppercase transition-all duration-150",
-              selectedRole === role
-                ? role === "student"
-                  ? "bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-sm"
-                : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300",
-            ].join(" ")}
-          >
-            {role}
-          </button>
-        ))}
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+            Edit {isStudent ? "Student" : "Teacher"}
+          </h2>
+          <p className="text-xs text-zinc-400 mt-0.5">
+            {person.prenom} {person.nom}
+            <span className="mx-1.5 text-zinc-300">·</span>
+            <span className="font-mono">{person.identifier ?? "—"}</span>
+          </p>
+        </div>
+        <span className={[
+          "text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full",
+          isStudent
+            ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
+            : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400",
+        ].join(" ")}>
+          {person.role}
+        </span>
       </div>
 
       <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
 
       {/* Form */}
-      <form id="create-person-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form id="edit-person-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
 
         <div className="grid grid-cols-2 gap-3">
           <Controller name="identifier" control={form.control} render={({ field, fieldState }) => (
@@ -399,39 +423,23 @@ export function CreatePersonForm({
 
         <Controller name="phone_number" control={form.control} render={({ field, fieldState }) => (
           <FieldRow icon={Phone} label="Phone" error={fieldState.error?.message}>
-            <input {...field} className={inputCls(fieldState.invalid)} placeholder="Optional" autoComplete="off" />
+            <input {...field} className={inputCls(fieldState.invalid)} autoComplete="off" placeholder="Optional" />
           </FieldRow>
         )} />
 
-        {/* Student section */}
+        {/* Student-only */}
         {isStudent && (
           <div className="rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 p-4 space-y-4">
             <p className="text-[10px] font-bold tracking-widest uppercase text-blue-400">Student info</p>
             <div className="grid grid-cols-2 gap-3">
               <Controller name="year" control={form.control} render={({ field, fieldState }) => (
                 <FieldRow icon={GraduationCap} label="Year" error={fieldState.error?.message}>
-                  <input
-                    {...field}
-                    className={inputCls(fieldState.invalid)}
-                    placeholder="e.g. 1"
-                    style={preYear && field.value === preYear ? { borderColor: '#93c5fd' } : {}}
-                  />
-                  {preYear && field.value === preYear && (
-                    <p className="mt-1 text-[11px] text-blue-400">Auto-filled from filter</p>
-                  )}
+                  <input {...field} className={inputCls(fieldState.invalid)} placeholder="e.g. 1" />
                 </FieldRow>
               )} />
               <Controller name="speciality" control={form.control} render={({ field, fieldState }) => (
                 <FieldRow icon={BookOpen} label="Speciality" error={fieldState.error?.message}>
-                  <input
-                    {...field}
-                    className={inputCls(fieldState.invalid)}
-                    placeholder="e.g. DSIA"
-                    style={preSpeciality && field.value === preSpeciality ? { borderColor: '#93c5fd' } : {}}
-                  />
-                  {preSpeciality && field.value === preSpeciality && (
-                    <p className="mt-1 text-[11px] text-blue-400">Auto-filled from filter</p>
-                  )}
+                  <input {...field} className={inputCls(fieldState.invalid)} placeholder="e.g. DSIA" />
                 </FieldRow>
               )} />
             </div>
@@ -443,11 +451,12 @@ export function CreatePersonForm({
           </div>
         )}
 
-        {/* Teacher section */}
+        {/* Teacher-only */}
         {!isStudent && (
           <div className="rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 space-y-4">
             <p className="text-[10px] font-bold tracking-widest uppercase text-emerald-400">Teacher info</p>
 
+            {/* ── Course multi-select ── */}
             <Controller
               name="courses"
               control={form.control}
@@ -480,15 +489,38 @@ export function CreatePersonForm({
       <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
 
       {/* Footer */}
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-rose-500 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete user
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete {person.prenom} {person.nom}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. The account will be permanently removed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-rose-500 hover:bg-rose-600 text-white">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <button
           type="submit"
-          form="create-person-form"
+          form="edit-person-form"
           disabled={isSubmitting}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-medium hover:bg-zinc-700 dark:hover:bg-zinc-100 transition-colors disabled:opacity-50"
         >
           <Save className="w-3.5 h-3.5" />
-          {isSubmitting ? "Creating…" : `Create ${isStudent ? "student" : "teacher"}`}
+          {isSubmitting ? "Saving…" : "Save changes"}
         </button>
       </div>
     </div>

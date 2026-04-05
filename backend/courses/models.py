@@ -5,12 +5,10 @@ class Course(models.Model):
     semester = models.ForeignKey('specialities.SpecialitySemester', on_delete=models.CASCADE, related_name='courses', null=True)
     name = models.CharField(max_length=150)
     coefficient = models.IntegerField(default=1)
-    teacher = models.ForeignKey(
+    teachers = models.ManyToManyField(
         TeacherProfile,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='courses'
+        related_name='courses',
+        blank=True
     )
     students = models.ManyToManyField(
         StudentProfile,
@@ -41,7 +39,7 @@ class StudentEvaluation(models.Model):
         unique_together = ('student', 'evaluation')
 
     def __str__(self): 
-        return f"{self.student.user.user.username} - {self.evaluation.name}: {self.grade}"
+        return f"{self.student.user.username} - {self.evaluation.name}: {self.grade}"
 
 
 
@@ -62,3 +60,4 @@ class StudentCourse(models.Model):
                 total += student_eval.grade * eval.weight
         self.final_grade = total 
         return self.final_grade
+    

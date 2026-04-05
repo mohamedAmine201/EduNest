@@ -14,7 +14,8 @@ import {toast} from 'sonner'
 import {useAuth} from './AuthContext'
 
 
-    export function NavigationMenuDemo() {
+    export function NavigationMenuBar() {
+    const {user} = useAuth()
     return (
         <NavigationMenu>
         <NavigationMenuList>
@@ -28,6 +29,20 @@ import {useAuth} from './AuthContext'
                 <Link to="/rooms">Rooms</Link>
             </NavigationMenuLink>
             </NavigationMenuItem>
+            {user && user.role === 'HEAD' && 
+            <NavigationMenuItem>
+            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                <Link to="/users">users</Link>
+            </NavigationMenuLink>
+            </NavigationMenuItem>
+            }
+            {user && user.role === 'TEACHER' && 
+            <NavigationMenuItem>
+            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                <Link to="/grades">grades</Link>
+            </NavigationMenuLink>
+            </NavigationMenuItem>
+            }
             <NavigationMenuItem>
             <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
                 <Link to="/profile">Profile</Link>

@@ -5,14 +5,12 @@ from .models import User
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     # Add your custom fields to the display
-    list_display = ('username', 'email', 'role', 'is_staff', 'is_active')
-    
-    # Add custom fields to the edit form (fieldsets)
+    list_display = ('username', 'email', 'role', 'identifier', 'phone_number', 'is_staff', 'is_active')
+
     fieldsets = BaseUserAdmin.fieldsets + (
-        ('Custom Info', {'fields': ('role', 'profile_pic', 'bio')}),
+    ('Custom Info', {'fields': ('role', 'identifier', 'profile_pic', 'bio', 'phone_number')}),
     )
-    
-    # Add custom fields to the "Add user" form too
+
     add_fieldsets = BaseUserAdmin.add_fieldsets + (
-        ('Custom Info', {'fields': ('role', 'profile_pic', 'bio')}),
+        ('Custom Info', {'fields': ('role', 'identifier', 'profile_pic', 'bio', 'phone_number')}),
     )

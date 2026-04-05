@@ -1,19 +1,23 @@
 from rapidfuzz import process
 
 FIELD_ALIASES = {
-    "matricule": ["matricule", "Matricule", "MATRICULE", "mat", "Mat", "id", "ID",
-                  "identifiant", "Identifiant", "code", "Code", "numéro", "numero"],
-    "nom":       ["nom", "Nom", "NOM", "name", "Name", "last_name", "lastname",
-                  "famille", "Famille", "nom complet", "Nom Complet", "NOM COMPLET",  # ← add these
-                  "full name", "Full Name", "fullname",
-                  "nom de famille", "Nom de famille"],
-    "prenom":    ["prenom", "Prenom", "prénom", "Prénom", "PRENOM", "first_name",
-                  "firstname", "given_name"],
-    "email":     ["email", "Email", "EMAIL", "e-mail", "E-mail", "mail",
-                  "Mail", "courriel", "Courriel"],
-    "course":    ["course", "Course", "COURSE", "matière", "Matière", "MATIERE",
-                  "matiere", "module", "Module", "MODULE", "cours", "Cours", "COURS",
-                  "subject", "Subject", "discipline", "Discipline"],
+    "identifier":    ["identifier", "Identifier", "IDENTIFIER", "matricule",
+                       "Matricule", "MATRICULE", "mat", "Mat", "id", "ID",
+                     "identifiant", "Identifiant", "code", "Code", "numéro", "numero"],
+    "nom":          ["nom", "Nom", "NOM", "name", "Name", "last_name", "lastname",
+                     "last_name", "last name", "Last Name",
+                     "famille", "Famille", "nom complet", "Nom Complet",
+                     "full name", "Full Name", "fullname", "nom de famille"],
+    "prenom":       ["prenom", "Prenom", "prénom", "Prénom", "PRENOM", "first_name",
+                     "first_name", "first name", "First Name",
+                     "firstname", "given_name"],
+    "email":        ["email", "Email", "EMAIL", "e-mail", "E-mail", "mail",
+                     "Mail", "courriel", "Courriel"],
+    "phone_number": ["phone", "Phone", "PHONE", "phone_number", "tel", "Tel",
+                     "téléphone", "Téléphone", "mobile", "Mobile"],
+    "course":       ["course", "Course", "COURSE", "matière", "Matière", "matiere",
+                     "module", "Module", "cours", "Cours", "subject", "Subject",
+                     "discipline", "Discipline"],
 }
 
 def detect_columns_fuzzy(headers: list[str]) -> dict:
@@ -29,7 +33,7 @@ def detect_columns_fuzzy(headers: list[str]) -> dict:
             candidates = [h for h in headers if h not in used_headers]
             if candidates:
                 match, score, _ = process.extractOne(query=field, choices=candidates)
-                if score > 80:
+                if score > 70:
                     mapping[field] = match
                     used_headers.add(match)
     return mapping

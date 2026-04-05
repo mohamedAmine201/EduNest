@@ -3,7 +3,6 @@ from django.forms import ValidationError
 
 class StudentProfile(models.Model):
     user = models.OneToOneField('users.User', on_delete=models.CASCADE, related_name='student_profile')
-    matricule = models.CharField(max_length=20, unique=True, blank=True)
     speciality_year = models.ForeignKey('specialities.SpecialityYear', on_delete=models.CASCADE, related_name='students', null=True, blank=True)
 
     def clean(self):
@@ -11,7 +10,7 @@ class StudentProfile(models.Model):
             raise ValidationError("This user role isn't a Student")
 
     def __str__(self):
-        return f"{self.matricule} - {self.user.email}"
+        return f"{self.user.identifier} {self.user.email}"
     
     @property
     def courses(self):

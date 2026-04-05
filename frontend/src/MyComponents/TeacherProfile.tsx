@@ -1,250 +1,738 @@
-import React, {useState} from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCaption, TableCell,
+  TableFooter, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { EditStudentGradeForm } from './EditStudentGradeForm';
-const people = [
-  // Year 1 - DSIA
-  { nom: "Benali", prenom: "Yasmine", year: "1", speciality: "DSIA", course: "TNS" },
-  { nom: "Khelifa", prenom: "Omar", year: "1", speciality: "DSIA", course: "TNS"  },
-  { nom: "Brahimi", prenom: "Sara", year: "1", speciality: "DSIA", course: "TNS"  },
-  { nom: "Cherif", prenom: "Adel", year: "1", speciality: "DSIA", course: "TNS"  },
-  { nom: "Haddad", prenom: "Nadia", year: "1", speciality: "DSIA", course: "TNS"  },
-  { nom: "Toumi", prenom: "Karim", year: "1", speciality: "DSIA", course: "TNS"  },
-  { nom: "Saadi", prenom: "Meriem", year: "1", speciality: "DSIA", course: "TNS"  },
-  { nom: "Belkacem", prenom: "Rachid", year: "1", speciality: "DSIA", course: "TNS"  },
-  { nom: "Zerrouki", prenom: "Lina", year: "1", speciality: "DSIA", course: "TNS"  },
-  { nom: "Hamidi", prenom: "Samir", year: "1", speciality: "DSIA", course: "TNS"  },
+  Upload, CheckCircle2, AlertTriangle,
+  X, FileSpreadsheet, Loader2, Plus, Scale, Download
+} from 'lucide-react'
+import { useAuth } from './AuthContext'
 
-  // Year 1 - MI
-  { nom: "Aziz", prenom: "Fatima", year: "1", speciality: "MI", course: "BDD"  },
-  { nom: "Belhadj", prenom: "Riad", year: "1", speciality: "MI", course: "BDD"  },
-  { nom: "Chouikh", prenom: "Leila", year: "1", speciality: "MI", course: "BDD"  },
-  { nom: "Djebbar", prenom: "Nabil", year: "1", speciality: "MI", course: "BDD"  },
-  { nom: "Guedj", prenom: "Samira", year: "1", speciality: "MI", course: "BDD"  },
-  { nom: "Haroun", prenom: "Mourad", year: "1", speciality: "MI", course: "BDD"  },
-  { nom: "Idir", prenom: "Amina", year: "1", speciality: "MI", course: "BDD"  },
-  { nom: "Jabbar", prenom: "Salah", year: "1", speciality: "MI", course: "BDD"  },
-  { nom: "Khellaf", prenom: "Noura", year: "1", speciality: "MI", course: "BDD"  },
-  { nom: "Lounis", prenom: "Fouad", year: "1", speciality: "MI", course: "BDD"  },
+const BASE_URL = import.meta.env.VITE_API_URL
 
-  // Year 2 - DSIA
-  { nom: "Meziane", prenom: "Aya", year: "2", speciality: "DSIA", course: "MEHO"  },
-  { nom: "Bensaid", prenom: "Yacine", year: "2", speciality: "DSIA", course: "MEHO"  },
-  { nom: "Djelloul", prenom: "Nour", year: "2", speciality: "DSIA", course: "MEHO"  },
-  { nom: "Ferhat", prenom: "Walid", year: "2", speciality: "DSIA", course: "MEHO"  },
-  { nom: "Mansouri", prenom: "Imane", year: "2", speciality: "DSIA", course: "MEHO"  },
-  { nom: "Boudjemaa", prenom: "Ali", year: "2", speciality: "DSIA", course: "MEHO"  },
-  { nom: "Rahmani", prenom: "Sofia", year: "2", speciality: "DSIA", course: "MEHO"  },
-  { nom: "Amrani", prenom: "Hichem", year: "2", speciality: "DSIA", course: "MEHO"  },
-  { nom: "Belaid", prenom: "Farah", year: "2", speciality: "DSIA", course: "MEHO"  },
-  { nom: "Kaci", prenom: "Mohamed", year: "2", speciality: "DSIA", course: "MEHO"  },
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-  // Year 2 - MI
-  { nom: "Mokhtar", prenom: "Selma", year: "2", speciality: "MI", course: "TI" },
-  { nom: "Nacer", prenom: "Karima", year: "2", speciality: "MI", course: "TI" },
-  { nom: "Othmani", prenom: "Bilal", year: "2", speciality: "MI", course: "TI" },
-  { nom: "Rahou", prenom: "Souad", year: "2", speciality: "MI", course: "TI" },
-  { nom: "Said", prenom: "Youssef", year: "2", speciality: "MI", course: "TI" },
-  { nom: "Tahar", prenom: "Nadia", year: "2", speciality: "MI", course: "TI" },
-  { nom: "Yahia", prenom: "Rania", year: "2", speciality: "MI", course: "TI" },
-  { nom: "Ziani", prenom: "Amine", year: "2", speciality: "MI", course: "TI" },
-  { nom: "Boukhalfa", prenom: "Lamia", year: "2", speciality: "MI", course: "TI" },
-  { nom: "Kerroum", prenom: "Hassan", year: "2", speciality: "MI", course: "TI" },
-];
-type CourseKey = "TNS" | "BDD" | "MEHO" | "TI";
+interface Student {
+  id: number
+  first_name: string
+  last_name: string
+}
 
-const courseEvaluations: Record<CourseKey, string[]> = {
-  TNS: ["Interro", "Examen"],
-  BDD: ["Interro", "Examen", "TP"],
-  MEHO: ["Examen", "TP"],
-  TI: ["Interro", "Examen", "Project"]
-};
+interface Evaluation {
+  id: number
+  name: string
+  weight: number
+}
 
+interface Course {
+  id: number
+  name: string
+  coefficient: number
+  evaluations: Evaluation[]
+  students: Student[]
+}
 
+interface MatchedRow {
+  student_id: number
+  display_name: string
+  match_score: number
+  grades: Record<string, number | null>
+}
 
+interface UnmatchedRow {
+  raw_name: string
+  grades: Record<string, number | null>
+}
 
-const handleImport = async (event) => {
-  const file = event.target.files[0];
-  const formData = new FormData();
-  formData.append("file", file);
+interface PreviewData {
+  eval_columns: string[]
+  matched: MatchedRow[]
+  unmatched: UnmatchedRow[]
+}
 
-  await fetch("/api/import_csv/", {
-    method: "POST",
-    body: formData,
-  });
-};
+interface GradeEntry {
+  student_id: number
+  eval_name: string
+  grade: number | null
+}
 
+// grades[studentId][evalName] = grade
+type GradeMap = Record<number, Record<string, number | null>>
+type FinalsMap = Record<number, number | null> 
 
-const HeadProfile = () => {
-const [selectedCourse, setSelectedCourse] = useState<CourseKey>("TNS");
-  const [selectedYear, setSelectedYear] = useState("1");
-  const [selectedSpeciality, setSelectedSpeciality] = useState("DSIA");
+// ─── CreateEvaluationModal ────────────────────────────────────────────────────
 
-  const [showForm, setShowForm] = useState(false);
-  const [selectedPerson, setSelectedPerson] = useState(null);
+interface CreateEvaluationModalProps {
+  course: Course
+  token: string
+  usedWeight: number
+  onClose: () => void
+  onCreated: (ev: Evaluation) => void
+}
 
-  const filtered = people.filter(
-    p => p.course === selectedCourse && p.year === selectedYear && p.speciality === selectedSpeciality
-  )
+function CreateEvaluationModal({ course, token, usedWeight, onClose, onCreated }: CreateEvaluationModalProps) {
+  const [name, setName] = useState('')
+  const [weight, setWeight] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleExport = () => {
-  // Convert filtered data to CSV
-  const headers = ["Nom", "Prenom", "Email"];
-  const rows = filtered.map(person => [
-    person.course,
-    person.nom,
-    person.prenom,
-  ]);
+  const remaining = parseFloat((1 - usedWeight).toFixed(3))
+  const weightNum = parseFloat(weight)
+  const weightValid = !isNaN(weightNum) && weightNum > 0 && weightNum <= remaining
 
-  const csvContent =
-    [headers, ...rows]
-      .map(e => e.join(","))
-      .join("\n");
-
-  // Create a downloadable file
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `people_${selectedCourse}_${selectedYear}_${selectedSpeciality}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
-  const handleRowClick = (person) => {
-    console.log("Clicked person object:", person.year);
-    setSelectedPerson(person);
-    setShowForm(true);
+  const handleSubmit = async () => {
+    if (!name.trim()) { setError('Evaluation name is required.'); return }
+    if (!weightValid) { setError(`Weight must be between 0 and ${remaining}.`); return }
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch(`${BASE_URL}/api/courses/${course.id}/evaluations/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify({ name: name.trim(), weight: weightNum }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(Array.isArray(data) ? data.join(' ') : data.detail || data.non_field_errors?.[0] || 'Failed to create evaluation.')
+        return
+      }
+      onCreated(data)
+      onClose()
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div className='mt-4'>
-      <h2 className='mb-4'>Your Courses are:</h2>
-      <div className="flex gap-4 mb-4">
-        <Input type="file" accept=".csv" onChange={handleImport} />
-        <Button onClick={handleExport}>Export CSV</Button>
-      </div>
-
-      {/* Dropdowns */}
-      <div className="flex gap-4 mb-4">
-        <Select value={selectedCourse} onValueChange={(val) => setSelectedCourse(val as CourseKey)}>
-          <SelectTrigger className="w-full max-w-48">
-            <SelectValue placeholder="Select a course" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectLabel>Course</SelectLabel>
-              <SelectItem value="TNS">TNS</SelectItem>
-              <SelectItem value="BDD">BDD</SelectItem>
-              <SelectItem value="MEHO">MEHO</SelectItem>
-              <SelectItem value="TI">TI</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedYear} onValueChange={setSelectedYear}>
-          <SelectTrigger className="w-full max-w-48">
-            <SelectValue placeholder="Select a Year" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectLabel>Role</SelectLabel>
-              <SelectItem value="1">1 Year</SelectItem>
-              <SelectItem value="2">2 Year</SelectItem>
-              <SelectItem value="3">3 Year</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedSpeciality} onValueChange={setSelectedSpeciality}>
-          <SelectTrigger className="w-full max-w-48">
-            <SelectValue placeholder="Select a Year" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectLabel>Speciality</SelectLabel>
-              <SelectItem value="DSIA">DSIA</SelectItem>
-              <SelectItem value="MI">MI</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </div>
-      <Table className='mb-4'>
-      <TableCaption>The list of {selectedYear} {selectedSpeciality}</TableCaption>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Nom</TableHead>
-          <TableHead>Prenom</TableHead>
-          {courseEvaluations[selectedCourse].map(evalName => (
-          <TableHead key={evalName}>{evalName}</TableHead>
-        ))}
-          <TableHead className='text-right'>Average</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filtered.map((person) => (
-          <TableRow key={person.course} onClick={() => handleRowClick(person)}>
-            <TableCell>{person.nom}</TableCell>
-            <TableCell>{person.prenom}</TableCell>
-            {courseEvaluations[selectedCourse].map(evalName => (
-            <TableCell key={evalName}>14</TableCell>
-            ))} 
-            <TableCell className='text-right'>14.5</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-      <TableFooter>
-        <TableRow>
-          <TableCell colSpan={courseEvaluations[selectedCourse].length + 2}>course</TableCell>
-          <TableCell className="text-right">{selectedCourse}</TableCell>
-        </TableRow>
-      </TableFooter>
-    </Table>
-    {showForm && (
-      <div className="fixed inset-0 z-50  flex items-center justify-center overflow-y-auto">
-          {/* Overlay */}
-          <div
-          className="fixed h-full inset-0 bg-black/40 backdrop-blur-sm"
-          onClick={() => setShowForm(false)}
-          ></div>
-
-          {/* Modal */}
-          <div className="relative z-10 w-full max-w-lg mx-4 rounded-lg shadow-lg p-6">
-          <Button
-              className="mb-4 self-end"
-              variant="outline"
-              onClick={() => setShowForm(false)}
-          >
-              Close
-          </Button>
-
-          {selectedPerson && 
-          <EditStudentGradeForm onClose={() => setShowForm(false)} role={selectedCourse} person={selectedPerson}/>
-          }
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center gap-2">
+            <Scale className="w-4 h-4 text-blue-600" />
+            <p className="font-semibold text-sm">New Evaluation — {course.name}</p>
           </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Weight budget bar */}
+          <div>
+            <div className="flex justify-between text-xs text-zinc-500 mb-1">
+              <span>Weight budget</span>
+              <span>{(usedWeight * 100).toFixed(0)}% used · {(remaining * 100).toFixed(0)}% remaining</span>
+            </div>
+            <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-500 rounded-full transition-all"
+                style={{ width: `${usedWeight * 100}%` }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1">Evaluation name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Examen, Interro, TP1…"
+              className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-600 mb-1">
+              Weight <span className="text-zinc-400">(0 – {remaining})</span>
+            </label>
+            <input
+              type="number"
+              value={weight}
+              onChange={e => setWeight(e.target.value)}
+              placeholder={`max ${remaining}`}
+              min={0}
+              max={remaining}
+              step={0.05}
+              className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {weight && !isNaN(weightNum) && (
+              <p className="text-xs text-zinc-400 mt-1">= {(weightNum * 100).toFixed(0)}% of final grade</p>
+            )}
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-zinc-200 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={loading || !name.trim() || !weightValid}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}
+          </Button>
+        </div>
       </div>
+    </div>
+  )
+}
+
+// ─── GradeImportModal ─────────────────────────────────────────────────────────
+
+function scoreColor(score: number) {
+  if (score >= 15) return 'text-emerald-600'
+  if (score >= 10) return 'text-amber-500'
+  return 'text-orange-500'
+}
+
+interface GradeImportModalProps {
+  course: Course
+  token: string
+  onClose: () => void
+  onSuccess: (result: { created: number; updated: number }) => void
+}
+
+function GradeImportModal({ course, token, onClose, onSuccess }: GradeImportModalProps) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [step, setStep] = useState<'idle' | 'loading' | 'preview' | 'confirming' | 'done'>('idle')
+  const [preview, setPreview] = useState<PreviewData | null>(null)
+  const [fileName, setFileName] = useState('')
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<{ created: number; updated: number } | null>(null)
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFileName(file.name)
+    setError('')
+    setStep('loading')
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      const res = await fetch(`${BASE_URL}/api/courses/${course.id}/grades/upload/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Token ${token}` },
+        body: formData,
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Upload failed.'); setStep('idle'); return }
+      setPreview(data)
+      setStep('preview')
+    } catch {
+      setError('Network error. Please try again.')
+      setStep('idle')
+    }
+  }
+
+  const handleConfirm = async () => {
+    if (!preview) return
+    setStep('confirming')
+    try {
+      const res = await fetch(`${BASE_URL}/api/courses/${course.id}/grades/confirm/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` },
+        body: JSON.stringify({
+          eval_columns: preview.eval_columns,
+          rows: preview.matched.map(r => ({ student_id: r.student_id, grades: r.grades })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Confirmation failed.'); setStep('preview'); return }
+      setResult({ created: data.created, updated: data.updated })
+      setStep('done')
+      onSuccess({ created: data.created, updated: data.updated })
+    } catch {
+      setError('Network error during confirmation.')
+      setStep('preview')
+    }
+  }
+
+  const reset = () => {
+    setStep('idle'); setPreview(null); setFileName(''); setError(''); setResult(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center gap-3">
+            <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+            <div>
+              <p className="font-semibold text-sm">Import Grades</p>
+              <p className="text-xs text-zinc-500">{course.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {(step === 'idle' || step === 'loading') && (
+            <div
+              className="border-2 border-dashed border-zinc-300 dark:border-zinc-600 rounded-xl p-10 flex flex-col items-center gap-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50/40 transition-all"
+              onClick={() => fileRef.current?.click()}
+            >
+              {step === 'loading'
+                ? <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
+                : <Upload className="w-10 h-10 text-zinc-400" />}
+              <div className="text-center">
+                <p className="font-medium text-zinc-700 dark:text-zinc-300">
+                  {step === 'loading' ? 'Analysing your file…' : 'Click to upload a spreadsheet'}
+                </p>
+                <p className="text-xs text-zinc-400 mt-1">
+                  CSV or Excel — must include <code>nom</code> and <code>prenom</code> columns
+                </p>
+                {course.evaluations.length > 0 && (
+                  <p className="text-xs text-blue-500 mt-1">
+                    Column headers will be matched to: {course.evaluations.map(e => e.name).join(', ')}
+                  </p>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFileChange} />
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {(step === 'preview' || step === 'confirming') && preview && (
+            <>
+              <div className="flex flex-wrap gap-2 items-center text-sm">
+                <span className="text-zinc-500">File:</span>
+                <Badge variant="secondary">{fileName}</Badge>
+                <span className="text-zinc-500 ml-2">Matched evaluations:</span>
+                {preview.eval_columns.map(col => (
+                  <Badge key={col} className="bg-blue-100 text-blue-700">{col}</Badge>
+                ))}
+              </div>
+
+              {preview.matched.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-zinc-700 mb-2 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    Matched students ({preview.matched.length})
+                  </p>
+                  <div className="rounded-lg border border-zinc-200 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-zinc-800">
+                          <TableHead className="text-xs">Name</TableHead>
+                          <TableHead className="text-xs">Match %</TableHead>
+                          {preview.eval_columns.map(col => (
+                            <TableHead key={col} className="text-xs">{col}</TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {preview.matched.map(row => (
+                          <TableRow key={row.student_id}>
+                            <TableCell className="font-medium text-sm">{row.display_name}</TableCell>
+                            <TableCell className={`text-sm font-mono ${scoreColor(row.match_score)}`}>
+                              {row.match_score}%
+                            </TableCell>
+                            {preview.eval_columns.map(col => (
+                              <TableCell key={col} className="text-sm">
+                                {row.grades[col] ?? <span className="text-zinc-400">—</span>}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {preview.unmatched.length > 0 && (
+                <div>
+                  <p className="text-sm font-semibold text-amber-600 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Unmatched — will be skipped ({preview.unmatched.length})
+                  </p>
+                  <div className="rounded-lg border border-amber-200 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-amber-800">
+                          <TableHead className="text-xs">Raw Name</TableHead>
+                          {preview.eval_columns.map(col => (
+                            <TableHead key={col} className="text-xs">{col}</TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {preview.unmatched.map((row, i) => (
+                          <TableRow key={i} className="bg-amber-500/50">
+                            <TableCell className="text-sm text-white">{row.raw_name}</TableCell>
+                            {preview.eval_columns.map(col => (
+                              <TableCell key={col} className="text-sm text-zinc-400">
+                                {row.grades[col] ?? '—'}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {step === 'done' && result && (
+            <div className="flex flex-col items-center gap-4 py-8 text-center">
+              <CheckCircle2 className="w-14 h-14 text-emerald-500" />
+              <div>
+                <p className="text-lg font-semibold">Grades saved successfully</p>
+                <p className="text-sm text-zinc-500 mt-1">
+                  {result.created} created · {result.updated} updated
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-zinc-200 flex justify-between items-center">
+          {step === 'preview' && (
+            <>
+              <Button variant="outline" onClick={reset}>← Different file</Button>
+              <Button
+                onClick={handleConfirm}
+                disabled={preview?.matched.length === 0}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Save grades for {preview?.matched.length} student{preview?.matched.length !== 1 ? 's' : ''}
+              </Button>
+            </>
+          )}
+          {step === 'confirming' && (
+            <Button disabled className="ml-auto bg-blue-600 text-white">
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…
+            </Button>
+          )}
+          {step === 'done' && (
+            <Button onClick={onClose} className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white">
+              Done
+            </Button>
+          )}
+          {(step === 'idle' || step === 'loading') && (
+            <Button variant="outline" onClick={onClose} className="ml-auto">Cancel</Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── TeacherProfile ───────────────────────────────────────────────────────────
+
+const TeacherProfile = () => {
+  const [courses, setCourses] = useState<Course[]>([])
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
+  const [grades, setGrades] = useState<GradeMap>({})
+  const [loading, setLoading] = useState(true)
+  const [showImport, setShowImport] = useState(false)
+  const [showCreateEval, setShowCreateEval] = useState(false)
+  const [finals, setFinals] = useState<FinalsMap>({})
+  const { token } = useAuth()
+
+  const fetchGrades = async (course: Course) => {
+  const res = await fetch(`${BASE_URL}/api/courses/${course.id}/grades/`, {
+    headers: { 'Authorization': `Token ${token}` },
+  })
+  const data = await res.json()
+  const map: GradeMap = {}
+  for (const entry of data.grades) {
+    if (!map[entry.student_id]) map[entry.student_id] = {}
+    map[entry.student_id][entry.eval_name] = entry.grade
+  }
+  setGrades(map)
+  setFinals(data.finals)  // ← set finals
+}
+
+useEffect(() => {
+  const fetchCourses = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/courses/`, {
+        headers: { 'Authorization': `Token ${token}` },
+      })
+      const data: Course[] = await res.json()
+      console.log(data)
+      setCourses(data)
+      if (data.length > 0) {
+        setSelectedCourse(data[0])
+        await fetchGrades(data[0])  // ← called with the first course
+      }
+    } catch (err) {
+      console.error('Failed to fetch courses:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+  fetchCourses()
+}, [token])  // ← token as dependency, not empty array
+
+  const handleSelectCourse = (course: Course) => {
+    setSelectedCourse(course)
+    setGrades({})
+    fetchGrades(course)
+  }
+
+  const handleEvalCreated = (newEval: Evaluation) => {
+    if (!selectedCourse) return
+    const updated = {
+      ...selectedCourse,
+      evaluations: [...(selectedCourse.evaluations ?? []), newEval],
+    }
+    setSelectedCourse(updated)
+    setCourses(prev => prev.map(c => c.id === updated.id ? updated : c))
+  }
+
+  const handleImportSuccess = () => {
+    setShowImport(false)
+    if (selectedCourse) fetchGrades(selectedCourse)
+  }
+// ─── Export helper ────────────────────────────────────────────────────────────
+
+  const exportGradesToCSV = (course: Course, students: Student[], evaluations: Evaluation[], grades: GradeMap, finals: FinalsMap) => {
+    const headers = ['Nom', 'Prénom', ...evaluations.map(ev => `${ev.name} (${(ev.weight * 100).toFixed(0)}%)`), 'Average']
+    
+    const rows = students.map(student => [
+      student.last_name,
+      student.first_name,
+      ...evaluations.map(ev => {
+        const grade = grades[student.id]?.[ev.name]
+        return grade !== null && grade !== undefined ? grade : ''
+      }),
+      finals[student.id] !== undefined && finals[student.id] !== null
+        ? finals[student.id]!.toFixed(2)
+        : '',
+    ])
+
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${course.name}_grades.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const usedWeight = (selectedCourse?.evaluations ?? []).reduce((sum, ev) => sum + ev.weight, 0)
+  const remaining = parseFloat((1 - usedWeight).toFixed(3))
+  const evaluations = selectedCourse?.evaluations ?? []
+  const students = selectedCourse?.students ?? []
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
+      </div>
+    )
+  }
+
+  if (courses.length === 0) {
+    return <div className="mt-4 text-sm text-zinc-500 w-[85%] mx-auto p-2">No courses assigned to you yet.</div>
+  }
+
+  return (
+    <div className="mt-4 space-y-4 w-[85%] mx-auto p-2">
+      <h2 className="font-semibold text-lg">Your Courses</h2>
+
+      {/* Course tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {courses.map(course => (
+          <button
+            key={course.id}
+            onClick={() => handleSelectCourse(course)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+              selectedCourse?.id === course.id
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-zinc-600 border-zinc-300 hover:border-blue-400'
+            }`}
+          >
+            {course.name}
+          </button>
+        ))}
+      </div>
+
+      {selectedCourse && (
+        <>
+          {/* Actions bar */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-zinc-500">
+                Coefficient: <span className="font-medium text-zinc-600">{selectedCourse.coefficient}</span>
+              </p>
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500 bg-zinc-100 px-2.5 py-1 rounded-full">
+                <Scale className="w-3 h-3" />
+                <span>
+                  {(usedWeight * 100).toFixed(0)}% assigned
+                  {remaining > 0 && <span className="text-zinc-400"> · {(remaining * 100).toFixed(0)}% free</span>}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateEval(true)}
+                disabled={remaining <= 0}
+                className="flex items-center gap-2 text-sm"
+                title={remaining <= 0 ? 'All weight assigned (total = 100%)' : ''}
+              >
+                <Plus className="w-4 h-4" />
+                New Evaluation
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => exportGradesToCSV(selectedCourse, students, evaluations, grades, finals)}
+                disabled={students.length === 0 || evaluations.length === 0}
+                className="flex items-center gap-2 text-sm"
+                title={students.length === 0 || evaluations.length === 0 ? 'No data to export' : ''}
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </Button>
+              <Button
+                onClick={() => setShowImport(true)}
+                disabled={evaluations.length === 0}
+                className="flex items-center gap-2"
+                title={evaluations.length === 0 ? 'Create at least one evaluation first' : ''}
+              >
+                <Upload className="w-4 h-4" />
+                Import Grades
+              </Button>
+              
+            </div>
+          </div>
+
+          {/* Hint when no evaluations yet */}
+          {evaluations.length === 0 && (
+            <div className="flex items-center gap-2 text-sm text-zinc-400 bg-zinc-50 border border-dashed border-zinc-300 rounded-lg px-4 py-3">
+              <Plus className="w-4 h-4" />
+              Create your first evaluation to get started. Each evaluation gets a weight that contributes to the final grade.
+            </div>
+          )}
+
+          {/* Evaluation pills */}
+          {evaluations.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {evaluations.map(ev => (
+                <span
+                  key={ev.id}
+                  className="inline-flex items-center gap-1.5 text-xs bg-blue-50 border border-blue-200 text-blue-700 px-2.5 py-1 rounded-full"
+                >
+                  {ev.name}
+                  <span className="text-blue-400">·</span>
+                  {(ev.weight * 100).toFixed(0)}%
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Grade table */}
+          <Table>
+            <TableCaption>{selectedCourse.name} — grade sheet</TableCaption>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nom</TableHead>
+                <TableHead>Prénom</TableHead>
+                {evaluations.map(ev => (
+                  <TableHead key={ev.id}>
+                    <div className="flex flex-col gap-0.5">
+                      <span>{ev.name}</span>
+                      <span className="text-[10px] font-normal text-zinc-400">{(ev.weight * 100).toFixed(0)}%</span>
+                    </div>
+                  </TableHead>
+                ))}
+                <TableHead className="text-right">Average</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {students.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={evaluations.length + 3} className="text-center text-zinc-400 py-8">
+                    No students enrolled yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                students.map(student => (
+                  <TableRow key={student.id}>
+                    <TableCell>{student.last_name}</TableCell>
+                    <TableCell>{student.first_name}</TableCell>
+                    {evaluations.map(ev => {
+                      const grade = grades[student.id]?.[ev.name]
+                      console.log(grade)
+                      return (
+                        <TableCell key={ev.id} className="text-sm">
+                          {grade !== null && grade !== undefined
+                            ? <span className="font-medium">{grade}</span>
+                            : <span className="text-zinc-400">—</span>}
+                        </TableCell>
+                      )
+                    })}
+                    <TableCell className="text-right font-medium text-sm">
+                      {finals[student.id] !== undefined && finals[student.id] !== null
+                        ? finals[student.id]!.toFixed(2)
+                        : '—'}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={evaluations.length + 2}>Course</TableCell>
+                <TableCell className="text-right">{selectedCourse.name}</TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </>
+      )}
+
+      {showCreateEval && selectedCourse && (
+        <CreateEvaluationModal
+          course={selectedCourse}
+          token={token!}
+          usedWeight={usedWeight}
+          onClose={() => setShowCreateEval(false)}
+          onCreated={handleEvalCreated}
+        />
+      )}
+
+      {showImport && selectedCourse && (
+        <GradeImportModal
+          course={selectedCourse}
+          token={token!}
+          onClose={() => setShowImport(false)}
+          onSuccess={handleImportSuccess}
+        />
       )}
     </div>
   )
 }
 
-export default HeadProfile
+export default TeacherProfile

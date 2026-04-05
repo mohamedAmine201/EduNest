@@ -3,6 +3,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 interface AuthContextType {
     token: string;
     user: any;
+    setUser: (user: any) => void;
     login: (tokenValue: string, user: any) => void;
     logout: () => void;
     loading: boolean;
@@ -38,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ token, user, login, logout, loading }}>
+        <AuthContext.Provider value={{ token, user, setUser, login, logout, loading }}>
             {!loading && children}
         </AuthContext.Provider>
     );
