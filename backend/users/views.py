@@ -211,6 +211,35 @@ from django.db import transaction
 from .utils import smart_detect_columns
 from specialities.models import SpecialityYear
 
+def find_header_row_generic(file, required_fields=None, max_scan=20):
+    """
+    Scan up to max_scan rows to find the one whose values best match
+    required_fields (case-insensitive substring match).
+    Returns the 0-based row index, or raises ValueError.
+    """
+    file.seek(0)
+    name = file.name.lower()
+
+    if name.endswith((".xlsx", ".xls")):
+        raw = pd.read_excel(file, header=None, nrows=max_scan, dtype=str)
+    else:
+        raw = pd.read_csv(file, header=None, nrows=max_scan, dtype=str)
+
+    required = [f.lower() for f in (required_fields or [])]
+
+    for i, row in raw.iterrows():
+        cells = [str(c).strip().lower() for c in row if pd.notna(c) and str(c).strip()]
+        if not cells:
+            continue
+        # Accept the row if every required field fuzzy-matches at least one cell
+        if all(any(req in cell or cell in req for cell in cells) for req in required):
+            return i
+
+    raise ValueError(
+        f"Could not find a header row containing {required_fields} "
+        f"in the first {max_scan} rows."
+    )
+
 REQUIRED_FIELDS = ["identifier", "nom", "prenom", "email"]
 
 class SpreadsheetUploadView(APIView):
@@ -218,11 +247,18 @@ class SpreadsheetUploadView(APIView):
         file = request.FILES.get("file")
         if not file:
             return Response({"error": "No file provided."}, status=400)
+
         try:
-            if file.name.endswith((".xlsx", ".xls")):
-                df = pd.read_excel(file)
+            header_row = find_header_row_generic(file, required_fields=REQUIRED_FIELDS)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
+
+        try:
+            file.seek(0)
+            if file.name.lower().endswith((".xlsx", ".xls")):
+                df = pd.read_excel(file, header=header_row, dtype=str)
             else:
-                df = pd.read_csv(file)
+                df = pd.read_csv(file, header=header_row, dtype=str)
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 

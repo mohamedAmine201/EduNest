@@ -10,6 +10,7 @@ import ProtectedRoute from "./MyComponents/ProtectedRoute"
 import { useAuth } from "./MyComponents/AuthContext"
 import HeadProfile from "./MyComponents/HeadProfile"
 import TeacherProfile from "./MyComponents/TeacherProfile"
+import StudentProfile from "./MyComponents/StudentProfile"
 
 
 function App() {
@@ -23,35 +24,45 @@ function App() {
       {path: '/login', element: <LoginPage />},
       {path: '/rooms', 
         element: (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['STUDENT', 'TEACHER', 'HEAD']}>
           <RoomsPage />
         </ProtectedRoute>
       )
       },
       {path: '/rooms/:id', 
         element: (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['STUDENT', 'TEACHER', 'HEAD']}>
           <RoomPage />
         </ProtectedRoute>
       )
       },
-      {path: '/users',
+      {
+        path: '/users',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['HEAD']}>
             <HeadProfile />
           </ProtectedRoute>
         )
       },
-      {path: '/grades',
+      {
+        path: '/data',
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['TEACHER']}>
             <TeacherProfile />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: '/grades',
+        element: (
+          <ProtectedRoute allowedRoles={['STUDENT']}>
+            <StudentProfile />
           </ProtectedRoute>
         )
       },
       {path: '/profile', 
         element: (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['STUDENT', 'TEACHER', 'HEAD']}>
           <ProfilePage />
         </ProtectedRoute>
       )

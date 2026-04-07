@@ -11,32 +11,6 @@ class StudentProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.identifier} {self.user.email}"
-    
-    @property
-    def courses(self):
-        from courses.models import Course
-        return Course.objects.filter(semester__speciality_year=self.speciality_year)
-    
-    def semester_avg(self, semester): 
-        if not semester: 
-            return None 
-        total, coeff_sum = 0, 0
-        for course in semester.courses.all():
-            sc = self.course_grades.filter(course=course).first()
-            if sc:
-                sc.calculate_final_grade()
-                if sc.final_grade is not None:
-                    total += sc.final_grade * course.coefficient
-                    coeff_sum += course.coefficient
-        return total / coeff_sum if coeff_sum > 0 else None
-
-    
-    def year_avg(self):
-        if not self.speciality_year:
-            return None
-        semesters = self.speciality_year.semesters.all()
-        avgs = [avg for sem in semesters if (avg := self.semester_avg(sem)) is not None]
-        return sum(avgs) / len(avgs) if avgs else None
 
 
 class TeacherProfile(models.Model): 

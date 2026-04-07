@@ -7,9 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Upload, CheckCircle2, AlertTriangle,
-  X, FileSpreadsheet, Loader2, Plus, Scale, Download
+  X, FileSpreadsheet, Loader2, Plus, Scale, Download,
+  BarChart2, TableIcon
 } from 'lucide-react'
 import { useAuth } from './AuthContext'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ReferenceLine, ResponsiveContainer, Cell
+} from 'recharts'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -53,15 +58,8 @@ interface PreviewData {
   unmatched: UnmatchedRow[]
 }
 
-interface GradeEntry {
-  student_id: number
-  eval_name: string
-  grade: number | null
-}
-
-// grades[studentId][evalName] = grade
 type GradeMap = Record<number, Record<string, number | null>>
-type FinalsMap = Record<number, number | null> 
+type FinalsMap = Record<number, number | null>
 
 // ─── CreateEvaluationModal ────────────────────────────────────────────────────
 
@@ -126,7 +124,6 @@ function CreateEvaluationModal({ course, token, usedWeight, onClose, onCreated }
         </div>
 
         <div className="px-6 py-5 space-y-4">
-          {/* Weight budget bar */}
           <div>
             <div className="flex justify-between text-xs text-zinc-500 mb-1">
               <span>Weight budget</span>
@@ -446,6 +443,199 @@ function GradeImportModal({ course, token, onClose, onSuccess }: GradeImportModa
   )
 }
 
+// ─── GradeBarChart ────────────────────────────────────────────────────────────
+
+interface GradeBarChartProps {
+  students: Student[]
+  evaluations: Evaluation[]
+  grades: GradeMap
+  finals: FinalsMap
+}
+
+function barColor(grade: number): string {
+  if (grade >= 16) return '#10b981'
+  if (grade >= 12) return '#3b82f6'
+  if (grade >= 10) return '#f59e0b'
+  return '#ef4444'
+}
+
+interface CustomBarTooltipProps {
+  active?: boolean
+  payload?: Array<{ payload: { name: string; grade: number } }>
+}
+
+function CustomBarTooltip({ active, payload }: CustomBarTooltipProps) {
+  if (!active || !payload?.length) return null
+  const d = payload[0].payload
+  return (
+    <div className="bg-white border border-zinc-200 rounded-lg shadow-lg px-3 py-2 text-sm">
+      <p className="font-semibold text-zinc-800">{d.name}</p>
+      <p className="text-zinc-500">
+        Grade: <span className="font-mono font-medium text-zinc-800">{d.grade.toFixed(2)}</span>
+      </p>
+    </div>
+  )
+}
+
+function GradeBarChart({ students, evaluations, grades, finals }: GradeBarChartProps) {
+  const [graphTarget, setGraphTarget] = useState<string>('average')
+
+  useEffect(() => {
+    if (graphTarget !== 'average' && !evaluations.find(ev => ev.name === graphTarget)) {
+      setGraphTarget('average')
+    }
+  }, [evaluations])
+
+  const chartData = students
+    .map(s => {
+      const grade = graphTarget === 'average'
+        ? finals[s.id]
+        : grades[s.id]?.[graphTarget]
+      if (grade === null || grade === undefined) return null
+      return {
+        name: `${s.first_name} ${s.last_name}`,
+        shortName: s.last_name,
+        grade,
+      }
+    })
+    .filter(Boolean) as { name: string; shortName: string; grade: number }[]
+
+  const avg = chartData.length > 0
+    ? chartData.reduce((sum, d) => sum + d.grade, 0) / chartData.length
+    : null
+
+  const targetLabel = graphTarget === 'average'
+    ? 'Average'
+    : evaluations.find(ev => ev.name === graphTarget)?.name ?? graphTarget
+
+  return (
+    <div className="space-y-4">
+      {/* Target picker */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium text-zinc-500 mr-1">Show:</span>
+        {evaluations.map(ev => (
+          <button
+            key={ev.name}
+            onClick={() => setGraphTarget(ev.name)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              graphTarget === ev.name
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-zinc-600 border-zinc-300 hover:border-blue-400'
+            }`}
+          >
+            {ev.name}
+            <span className="ml-1 opacity-60">· {(ev.weight * 100).toFixed(0)}%</span>
+          </button>
+        ))}
+        <button
+          onClick={() => setGraphTarget('average')}
+          className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+            graphTarget === 'average'
+              ? 'bg-zinc-800 text-white border-zinc-800'
+              : 'bg-white text-zinc-600 border-zinc-300 hover:border-zinc-500'
+          }`}
+        >
+          Average
+        </button>
+      </div>
+
+      {/* Stats strip */}
+      {chartData.length > 0 && avg !== null && (
+        <div className="flex gap-4 flex-wrap text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-2.5">
+          <span><span className="font-medium text-zinc-700">Showing:</span> {targetLabel}</span>
+          <span><span className="font-medium text-zinc-700">Graded:</span> {chartData.length} / {students.length}</span>
+          <span>
+            <span className="font-medium text-zinc-700">Class avg:</span>{' '}
+            <span className="font-mono">{avg.toFixed(2)}</span>
+          </span>
+          <span>
+            <span className="font-medium text-zinc-700">Min:</span>{' '}
+            <span className="font-mono">{Math.min(...chartData.map(d => d.grade)).toFixed(2)}</span>
+          </span>
+          <span>
+            <span className="font-medium text-zinc-700">Max:</span>{' '}
+            <span className="font-mono">{Math.max(...chartData.map(d => d.grade)).toFixed(2)}</span>
+          </span>
+        </div>
+      )}
+
+      {/* Chart */}
+      {chartData.length === 0 ? (
+        <div className="flex items-center justify-center h-64 bg-zinc-50 border border-dashed border-zinc-300 rounded-xl text-sm text-zinc-400">
+          No grades recorded for {targetLabel} yet.
+        </div>
+      ) : (
+        <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4">
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={chartData} margin={{ top: 16, right: 24, bottom: 32, left: 0 }} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+              <XAxis
+                dataKey="shortName"
+                tick={{ fontSize: 11, fill: 'black' }}
+                angle={-35}
+                textAnchor="end"
+                interval={0}
+                height={48}
+              />
+              <YAxis
+                domain={[0, 20]}
+                ticks={[0, 5, 10, 15, 20]}
+                tick={{ fontSize: 11, fill: '#a1a1aa' }}
+                width={28}
+              />
+              <Tooltip content={<CustomBarTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+
+              {/* Pass/fail line */}
+              <ReferenceLine
+                y={10}
+                stroke="black"
+                strokeDasharray="4 4"
+                strokeWidth={1}
+                label={{ value: 'pass', position: 'insideTopRight', fontSize: 10, fill: 'black' }}
+              />
+
+              {/* Average dashed line */}
+              {avg !== null && (
+                <ReferenceLine
+                  y={avg}
+                  stroke="#6366f1"
+                  strokeDasharray="6 3"
+                  strokeWidth={1.5}
+                  label={{
+                    value: `avg ${avg.toFixed(2)}`,
+                    position: 'insideTopRight',
+                    fontSize: 11,
+                    fill: '#6366f1',
+                    fontWeight: 600,
+                  }}
+                />
+              )}
+
+              <Bar dataKey="grade" radius={[4, 4, 0, 0]} isAnimationActive={true}>
+                {chartData.map((entry, index) => (
+                  <Cell key={index} fill={barColor(entry.grade)} fillOpacity={0.85} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+
+          {/* Legend */}
+          <div className="flex items-center gap-4 justify-center mt-2 text-xs text-zinc-500">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> ≥ 16</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" /> 12 – 15</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block" /> 10 – 11</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-red-500 inline-block" /> &lt; 10</span>
+            <span className="flex items-center gap-1.5">
+              <svg width="20" height="8"><line x1="0" y1="4" x2="20" y2="4" stroke="#6366f1" strokeWidth="1.5" strokeDasharray="6 3" /></svg>
+              Class avg
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── TeacherProfile ───────────────────────────────────────────────────────────
 
 const TeacherProfile = () => {
@@ -456,43 +646,43 @@ const TeacherProfile = () => {
   const [showImport, setShowImport] = useState(false)
   const [showCreateEval, setShowCreateEval] = useState(false)
   const [finals, setFinals] = useState<FinalsMap>({})
+  const [view, setView] = useState<'table' | 'graph'>('table')
   const { token } = useAuth()
 
   const fetchGrades = async (course: Course) => {
-  const res = await fetch(`${BASE_URL}/api/courses/${course.id}/grades/`, {
-    headers: { 'Authorization': `Token ${token}` },
-  })
-  const data = await res.json()
-  const map: GradeMap = {}
-  for (const entry of data.grades) {
-    if (!map[entry.student_id]) map[entry.student_id] = {}
-    map[entry.student_id][entry.eval_name] = entry.grade
-  }
-  setGrades(map)
-  setFinals(data.finals)  // ← set finals
-}
-
-useEffect(() => {
-  const fetchCourses = async () => {
-    try {
-      const res = await fetch(`${BASE_URL}/api/courses/`, {
-        headers: { 'Authorization': `Token ${token}` },
-      })
-      const data: Course[] = await res.json()
-      console.log(data)
-      setCourses(data)
-      if (data.length > 0) {
-        setSelectedCourse(data[0])
-        await fetchGrades(data[0])  // ← called with the first course
-      }
-    } catch (err) {
-      console.error('Failed to fetch courses:', err)
-    } finally {
-      setLoading(false)
+    const res = await fetch(`${BASE_URL}/api/courses/${course.id}/grades/`, {
+      headers: { 'Authorization': `Token ${token}` },
+    })
+    const data = await res.json()
+    const map: GradeMap = {}
+    for (const entry of data.grades) {
+      if (!map[entry.student_id]) map[entry.student_id] = {}
+      map[entry.student_id][entry.eval_name] = entry.grade
     }
+    setGrades(map)
+    setFinals(data.finals)
   }
-  fetchCourses()
-}, [token])  // ← token as dependency, not empty array
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/courses/`, {
+          headers: { 'Authorization': `Token ${token}` },
+        })
+        const data: Course[] = await res.json()
+        setCourses(data)
+        if (data.length > 0) {
+          setSelectedCourse(data[0])
+          await fetchGrades(data[0])
+        }
+      } catch (err) {
+        console.error('Failed to fetch courses:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchCourses()
+  }, [token])
 
   const handleSelectCourse = (course: Course) => {
     setSelectedCourse(course)
@@ -514,11 +704,15 @@ useEffect(() => {
     setShowImport(false)
     if (selectedCourse) fetchGrades(selectedCourse)
   }
-// ─── Export helper ────────────────────────────────────────────────────────────
 
-  const exportGradesToCSV = (course: Course, students: Student[], evaluations: Evaluation[], grades: GradeMap, finals: FinalsMap) => {
+  const exportGradesToCSV = (
+    course: Course,
+    students: Student[],
+    evaluations: Evaluation[],
+    grades: GradeMap,
+    finals: FinalsMap,
+  ) => {
     const headers = ['Nom', 'Prénom', ...evaluations.map(ev => `${ev.name} (${(ev.weight * 100).toFixed(0)}%)`), 'Average']
-    
     const rows = students.map(student => [
       student.last_name,
       student.first_name,
@@ -530,7 +724,6 @@ useEffect(() => {
         ? finals[student.id]!.toFixed(2)
         : '',
     ])
-
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -595,7 +788,34 @@ useEffect(() => {
                 </span>
               </div>
             </div>
+
             <div className="flex items-center gap-2">
+              {/* View toggle */}
+              <div className="flex items-center bg-zinc-100 rounded-lg p-0.5 border border-zinc-200">
+                <button
+                  onClick={() => setView('table')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    view === 'table'
+                      ? 'bg-white text-zinc-800 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-700'
+                  }`}
+                >
+                  <TableIcon className="w-3.5 h-3.5" />
+                  Table
+                </button>
+                <button
+                  onClick={() => setView('graph')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    view === 'graph'
+                      ? 'bg-white text-zinc-800 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-700'
+                  }`}
+                >
+                  <BarChart2 className="w-3.5 h-3.5" />
+                  Graph
+                </button>
+              </div>
+
               <Button
                 variant="outline"
                 onClick={() => setShowCreateEval(true)}
@@ -625,7 +845,6 @@ useEffect(() => {
                 <Upload className="w-4 h-4" />
                 Import Grades
               </Button>
-              
             </div>
           </div>
 
@@ -653,63 +872,80 @@ useEffect(() => {
             </div>
           )}
 
-          {/* Grade table */}
-          <Table>
-            <TableCaption>{selectedCourse.name} — grade sheet</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Prénom</TableHead>
-                {evaluations.map(ev => (
-                  <TableHead key={ev.id}>
-                    <div className="flex flex-col gap-0.5">
-                      <span>{ev.name}</span>
-                      <span className="text-[10px] font-normal text-zinc-400">{(ev.weight * 100).toFixed(0)}%</span>
-                    </div>
-                  </TableHead>
-                ))}
-                <TableHead className="text-right">Average</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {students.length === 0 ? (
+          {/* ── TABLE VIEW ── */}
+          {view === 'table' && (
+            <Table>
+              <TableCaption>{selectedCourse.name} — grade sheet</TableCaption>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={evaluations.length + 3} className="text-center text-zinc-400 py-8">
-                    No students enrolled yet.
-                  </TableCell>
+                  <TableHead>Nom</TableHead>
+                  <TableHead>Prénom</TableHead>
+                  {evaluations.map(ev => (
+                    <TableHead key={ev.id}>
+                      <div className="flex flex-col gap-0.5">
+                        <span>{ev.name}</span>
+                        <span className="text-[10px] font-normal text-zinc-400">{(ev.weight * 100).toFixed(0)}%</span>
+                      </div>
+                    </TableHead>
+                  ))}
+                  <TableHead className="text-right">Average</TableHead>
                 </TableRow>
-              ) : (
-                students.map(student => (
-                  <TableRow key={student.id}>
-                    <TableCell>{student.last_name}</TableCell>
-                    <TableCell>{student.first_name}</TableCell>
-                    {evaluations.map(ev => {
-                      const grade = grades[student.id]?.[ev.name]
-                      console.log(grade)
-                      return (
-                        <TableCell key={ev.id} className="text-sm">
-                          {grade !== null && grade !== undefined
-                            ? <span className="font-medium">{grade}</span>
-                            : <span className="text-zinc-400">—</span>}
-                        </TableCell>
-                      )
-                    })}
-                    <TableCell className="text-right font-medium text-sm">
-                      {finals[student.id] !== undefined && finals[student.id] !== null
-                        ? finals[student.id]!.toFixed(2)
-                        : '—'}
+              </TableHeader>
+              <TableBody>
+                {students.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={evaluations.length + 3} className="text-center text-zinc-400 py-8">
+                      No students enrolled yet.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell colSpan={evaluations.length + 2}>Course</TableCell>
-                <TableCell className="text-right">{selectedCourse.name}</TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
+                ) : (
+                  students.map(student => (
+                    <TableRow key={student.id}>
+                      <TableCell>{student.last_name}</TableCell>
+                      <TableCell>{student.first_name}</TableCell>
+                      {evaluations.map(ev => {
+                        const grade = grades[student.id]?.[ev.name]
+                        return (
+                          <TableCell key={ev.id} className="text-sm">
+                            {grade !== null && grade !== undefined
+                              ? <span className="font-medium">{grade}</span>
+                              : <span className="text-zinc-400">—</span>}
+                          </TableCell>
+                        )
+                      })}
+                      <TableCell className="text-right font-medium text-sm">
+                        {finals[student.id] !== undefined && finals[student.id] !== null
+                          ? finals[student.id]!.toFixed(2)
+                          : '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={evaluations.length + 2}>Course</TableCell>
+                  <TableCell className="text-right">{selectedCourse.name}</TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          )}
+
+          {/* ── GRAPH VIEW ── */}
+          {view === 'graph' && (
+            evaluations.length === 0 ? (
+              <div className="flex items-center justify-center h-64 bg-zinc-50 border border-dashed border-zinc-300 rounded-xl text-sm text-zinc-400">
+                Create evaluations first to see the graph view.
+              </div>
+            ) : (
+              <GradeBarChart
+                students={students}
+                evaluations={evaluations}
+                grades={grades}
+                finals={finals}
+              />
+            )
+          )}
         </>
       )}
 

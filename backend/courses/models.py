@@ -60,4 +60,3 @@ class StudentCourse(models.Model):
                 total += student_eval.grade * eval.weight
         self.final_grade = total 
         return self.final_grade
-    

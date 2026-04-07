@@ -28,6 +28,44 @@ class CourseListeCreateAPIView(generics.ListCreateAPIView):
             return Course.objects.all()
         return Course.objects.none()
 
+class StudentCoursesAPIView(APIView):
+    def get(self, request):
+        student = request.user.student_profile
+        semester_num = request.query_params.get('semester')
+
+        qs = StudentCourse.objects.filter(
+            student=student
+        ).select_related('course__semester')
+
+        if semester_num:
+            qs = qs.filter(
+                course__semester__semester=semester_num
+            )
+
+        result = []
+        for sc in qs:
+            course = sc.course
+            evaluations = course.evaluations.all()
+            evals_data = []
+            for ev in evaluations:
+                student_eval = StudentEvaluation.objects.filter(
+                    student=student, evaluation=ev
+                ).first()
+                evals_data.append({
+                    'id': ev.id,
+                    'name': ev.name,
+                    'weight': ev.weight,
+                    'grade': student_eval.grade if student_eval else None,
+                })
+            result.append({
+                'id': course.id,
+                'name': course.name,
+                'coefficient': course.coefficient,
+                'semester': course.semester.semester, 
+                'evaluations': evals_data,
+                'final_grade': sc.calculate_final_grade(),
+            })
+        return Response(result)
 
 class CourseDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Course.objects.all()
@@ -128,6 +166,34 @@ def match_student(full_name, candidates):
         return candidates[matched_name], score 
     return None, 0
 
+def find_header_row(file, existing_evals, max_scan=20):
+    """
+    Scan up to max_scan rows to find the one that contains
+    nom/prenom/eval columns. Returns the 0-based row index, or raises.
+    """
+    file.seek(0)
+    name = file.name.lower()
+
+    if name.endswith(".csv"):
+        raw = pd.read_csv(file, header=None, nrows=max_scan, dtype=str)
+    else:
+        raw = pd.read_excel(file, header=None, nrows=max_scan, dtype=str)
+
+    for i, row in raw.iterrows():
+        candidate_cols = [str(c).strip() for c in row if pd.notna(c) and str(c).strip()]
+        if not candidate_cols:
+            continue
+        try:
+            detect_grade_columns(candidate_cols, existing_evals)
+            return i          # this row works as a header
+        except (ValueError, KeyError):
+            continue
+
+    raise ValueError(
+        "Could not find a header row containing 'nom', 'prenom', "
+        "and at least one grade column in the first "
+        f"{max_scan} rows."
+    )
 
 class GradeUploadPreviewAPIView(APIView):
     def post(self, request, course_id):
@@ -136,20 +202,28 @@ class GradeUploadPreviewAPIView(APIView):
         if not file:
             return Response({"error": "No file provided."}, status=400)
 
+        # ── file reading ──────────────────────────────────────────────────────────────
         name = file.name.lower()
+        existing_evals = list(course.evaluations.values_list('name', flat=True))
+
+        try:
+            header_row = find_header_row(file, existing_evals)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
+
+        file.seek(0)   # rewind after the scan
         if name.endswith(".csv"):
-            df = pd.read_csv(file)
+            df = pd.read_csv(file, header=header_row, dtype=str)
         elif name.endswith((".xlsx", ".xls")):
-            df = pd.read_excel(file)
+            df = pd.read_excel(file, header=header_row, dtype=str)
         else:
             return Response({"error": "Unsupported format."}, status=400)
 
-        # Drop columns with no name (empty leading/trailing columns)
+        # existing cleanup: strip nameless/nan/empty columns and blank rows
         df = df.loc[:, df.columns.notna()]
-        # Drop columns where the header is literally 'nan' as a string
         df = df.loc[:, ~df.columns.astype(str).str.strip().isin(['nan', ''])]
-        # Drop rows that are entirely empty
         df = df.dropna(how='all')
+        # ── rest of the view stays exactly the same ───────────────────────────────────
         try:
             existing_evals = list(course.evaluations.values_list('name', flat=True))
             col_map = detect_grade_columns(list(df.columns), existing_evals)

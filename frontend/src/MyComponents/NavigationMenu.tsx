@@ -32,14 +32,21 @@ import {useAuth} from './AuthContext'
             {user && user.role === 'HEAD' && 
             <NavigationMenuItem>
             <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-                <Link to="/users">users</Link>
+                <Link to="/users">Users</Link>
             </NavigationMenuLink>
             </NavigationMenuItem>
             }
             {user && user.role === 'TEACHER' && 
             <NavigationMenuItem>
             <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-                <Link to="/grades">grades</Link>
+                <Link to="/data">Data</Link>
+            </NavigationMenuLink>
+            </NavigationMenuItem>
+            }
+            {user && user.role === 'STUDENT' && 
+            <NavigationMenuItem>
+            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                <Link to="/grades">Grades</Link>
             </NavigationMenuLink>
             </NavigationMenuItem>
             }
