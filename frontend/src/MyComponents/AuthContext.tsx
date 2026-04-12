@@ -1,5 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 
+const BASE_URL = import.meta.env.VITE_API_URL
+
 interface AuthContextType {
     token: string;
     user: any;
@@ -13,29 +15,51 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [token, setToken] = useState('');
-    const [user, setUser] = useState(null);
+    const [user, setUserState] = useState(null); // Rename internal state
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const storedToken = localStorage.getItem('token');
         const storedUser = localStorage.getItem('user');
         if (storedToken) setToken(storedToken);
-        if (storedUser) setUser(JSON.parse(storedUser));
+        if (storedUser) {
+            try {
+                setUserState(JSON.parse(storedUser));
+            } catch (e) {
+                console.error("Failed to parse user from storage", e);
+            }
+        }
         setLoading(false);
     }, []);
 
-    const login = (tokenValue: string, user: any) => {
+    // ─── THE CRUCIAL UPDATE ─────────────────────────────────────────────────
+    const setUser = (newUser: any) => {
+        // If newUser is a function (functional update pattern), handle it
+        const valueToStore = typeof newUser === 'function' ? newUser(user) : newUser;
+        
+        setUserState(valueToStore);
+        
+        if (valueToStore) {
+            localStorage.setItem('user', JSON.stringify(valueToStore));
+        } else {
+            localStorage.removeItem('user');
+        }
+    };
+    // ────────────────────────────────────────────────────────────────────────
+
+    const login = (tokenValue: string, userValue: any) => {
         setToken(tokenValue);
-        setUser(user);
+        setUser(userValue); // Uses our new synchronized function
         localStorage.setItem('token', tokenValue);
-        localStorage.setItem('user', JSON.stringify(user));
     };
 
+    
     const logout = () => {
-        setToken('');
-        setUser(null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    // Don't touch the subscription at all on logout
+    setToken('');
+    setUserState(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     };
 
     return (

@@ -1,6 +1,8 @@
 import * as React from 'react'
+import { useDebounce } from 'use-debounce'
 import { useAuth } from '@/MyComponents/AuthContext'
-import { Pencil, Check, X, Camera, Phone, FileText } from 'lucide-react'
+import { Pencil, Check, X, Camera, Phone, FileText, Search} from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 
 const BASE_URL = import.meta.env.VITE_API_URL
@@ -11,6 +13,12 @@ type EditFields = {
   bio:          string
   phone_number: string
   profile_pic:  File | null
+}
+
+type SearchUser = {
+  id: number
+  username: string
+  profile_pic: string | null
 }
 
 // ─── Helper: field row ────────────────────────────────────────────────────────
@@ -50,8 +58,12 @@ const ProfilePage = () => {
 
   const [editing, setEditing]       = React.useState(false)
   const [saving, setSaving]         = React.useState(false)
+  const [query, setQuery]           = React.useState('')
+  const [results, setResults] = React.useState<SearchUser[]>([])
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
+  const [selectedProfile, setSelectedProfile] = React.useState<any>(null)
   const fileInputRef                = React.useRef<HTMLInputElement>(null)
+  const [debouncedQuery] = useDebounce(query, 400)
 
   const [fields, setFields] = React.useState<EditFields>({
     bio:          user?.bio          ?? '',
@@ -121,6 +133,42 @@ const ProfilePage = () => {
     }
   }
   React.useEffect(() => {
+    if (!debouncedQuery) {
+      setResults([])
+      return
+    }
+
+    const fetchSearch = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/profiles/search/?q=${debouncedQuery}`, {
+          headers: { Authorization: `Token ${token}` },
+        })
+        const data = await res.json()
+        setResults(data)
+      } catch {
+        toast.error('Search failed')
+      }
+    }
+
+    fetchSearch()
+  }, [debouncedQuery])
+
+  const loadProfile = async (r: any) => {
+    try {
+      const res = await fetch(`${BASE_URL}/api/profiles/${r.id}/?role=${r.role}`, {
+        headers: { Authorization: `Token ${token}` },
+      })
+      const data = await res.json()
+      console.log(data)
+      setSelectedProfile(data)
+      setEditing(false)
+    } catch {
+      toast.error('Failed to load profile')
+    }
+  }
+
+
+  React.useEffect(() => {
     if (!editing) return 
     const handler = (e:KeyboardEvent) => {
       if (e.key=='Enter' && !e.shiftKey) {
@@ -132,13 +180,76 @@ const ProfilePage = () => {
     return () => document.removeEventListener('keydown', handler)
   }, [editing, fields, saving])
 
-  const avatarSrc = previewUrl ?? user?.profile_pic ?? null
+  const displayedUser = selectedProfile || user
+  const isOwnProfile = !selectedProfile || selectedProfile.id === user?.id
+  const avatarSrc = previewUrl ?? displayedUser?.profile_pic ?? null
+
+  const removeSearch = () => {
+  console.log('Button Clicked!'); // This should now appear
+  setQuery('');
+  setResults([]);
+  setSelectedProfile(null); // This is the key to going back to "Your" profile
+};
 
   const inputCls =
     'w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all duration-150 resize-none'
 
   return (
     <div className="w-[85%] mx-auto py-10">
+      <div className="relative w-[50%] flex items-center mx-auto mb-4 gap-2">
+        {/* The X button to the left (Optional, but good for UX) */}
+        {(query || selectedProfile) && (
+          <button 
+            onClick={removeSearch}
+            className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        )}
+
+        <div className="relative flex-1">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search for a Profile"
+            className="pr-10" // Space for the icon on the right
+          />
+          
+          {/* The Search Button: 
+            We add z-10 to ensure it stays above the Input field.
+          */}
+          <button 
+            onClick={removeSearch} 
+            type="button"
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 text-gray-500 hover:text-black transition-colors"
+          >
+            <Search size={20} />
+          </button>
+        </div>
+
+        {/* RESULTS DROPDOWN */}
+        {results.length > 0 && (
+          <div className="absolute top-12 left-0 w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl z-[60]">
+            {results.map((r) => (
+              <div
+                key={r.id}
+                onClick={() => {
+                  loadProfile(r);
+                  setResults([]);
+                  setQuery(r.username);
+                }}
+                className="flex items-center gap-3 p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer border-b last:border-0 dark:border-zinc-800"
+              >
+                <img
+                  src={r.profile_pic || ''}
+                  className="w-8 h-8 rounded-full object-cover bg-zinc-200"
+                />
+                <span className="text-sm font-medium">{r.username}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
 
         {/* ── Top accent bar ── */}
@@ -156,7 +267,7 @@ const ProfilePage = () => {
                   <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-3xl font-bold text-zinc-300 dark:text-zinc-600 select-none">
-                    {user?.first_name?.[0]?.toUpperCase() ?? '?'}
+                    {displayedUser?.first_name?.[0]?.toUpperCase() ?? '?'}
                   </span>
                 )}
               </div>
@@ -183,15 +294,15 @@ const ProfilePage = () => {
             {/* Name */}
             <div className="text-center space-y-0.5">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 leading-tight">
-                {user?.last_name} {user?.first_name}
+                {displayedUser?.last_name} {displayedUser?.first_name}
               </h2>
-              <p className="text-xs text-zinc-400 font-mono">{user?.email}</p>
+              <p className="text-xs text-zinc-400 font-mono">{displayedUser?.email}</p>
             </div>
 
             {/* Role badge */}
-            {user?.role && (
+            {displayedUser?.role && (
               <span className="text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-                {user.role}
+                {displayedUser.role}
               </span>
             )}
           </div>
@@ -205,33 +316,35 @@ const ProfilePage = () => {
                 Profile details
               </h3>
 
-              {!editing ? (
-                <button
-                  onClick={startEditing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:border-blue-400 hover:text-blue-500 transition-all duration-150"
-                >
-                  <Pencil className="w-3 h-3" />
-                  Edit
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
+              {isOwnProfile && (
+                !editing ? (
                   <button
-                    onClick={cancelEditing}
-                    disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-500 border border-zinc-200 dark:border-zinc-700 hover:border-rose-400 hover:text-rose-500 transition-all duration-150 disabled:opacity-50"
+                    onClick={startEditing}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:border-blue-400 hover:text-blue-500 transition-all duration-150"
                   >
-                    <X className="w-3 h-3" />
-                    Cancel
+                    <Pencil className="w-3 h-3" />
+                    Edit
                   </button>
-                  <button
-                    onClick={handleConfirm}
-                    disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-700 dark:hover:bg-zinc-100 transition-all duration-150 disabled:opacity-50"
-                  >
-                    <Check className="w-3 h-3" />
-                    {saving ? 'Saving…' : 'Confirm'}
-                  </button>
-                </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={cancelEditing}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-500 border border-zinc-200 dark:border-zinc-700 hover:border-rose-400 hover:text-rose-500 transition-all duration-150 disabled:opacity-50"
+                    >
+                      <X className="w-3 h-3" />
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirm}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-700 dark:hover:bg-zinc-100 transition-all duration-150 disabled:opacity-50"
+                    >
+                      <Check className="w-3 h-3" />
+                      {saving ? 'Saving…' : 'Confirm'}
+                    </button>
+                  </div>
+                )
               )}
             </div>
 
@@ -241,7 +354,7 @@ const ProfilePage = () => {
             <InfoRow
               icon={FileText}
               label="Bio"
-              value={user?.bio}
+              value={displayedUser?.bio}
               editing={editing}
               inputNode={
                 <textarea
@@ -258,7 +371,7 @@ const ProfilePage = () => {
             <InfoRow
               icon={Phone}
               label="Phone number"
-              value={user?.phone_number}
+              value={displayedUser?.phone_number}
               editing={editing}
               inputNode={
                 <input

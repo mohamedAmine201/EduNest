@@ -21,6 +21,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
     } from "@/components/ui/alert-dialog"
+import { X } from 'lucide-react'
 import { AvatarDemo } from '@/MyComponents/Avatar'
 import { Input } from '@/components/ui/input'
 import { toast } from "sonner"
@@ -54,6 +55,7 @@ const RoomPage = () => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [file, setFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [text, setText] = useState("");
     const navigate = useNavigate();
 
@@ -106,13 +108,25 @@ const RoomPage = () => {
         fileInputRef.current?.click()  
     }
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { 
-        const selected = e.target.files?.[0] || null 
-        setFile(selected) 
-        if (selected) { 
-        setText(`${text} Attached: ${selected.name}`) 
-        }   
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+        if (selectedFile.type.startsWith('image/')) {
+            setPreviewUrl(URL.createObjectURL(selectedFile));
+        } else {
+            setPreviewUrl(null); // It's a PDF
+        }
+        if (selectedFile.size > 5 * 1024 * 1024) {
+            toast.error("File is too large (Max 5MB)");
+            return;
+        }
+        setFile(selectedFile);
+        setText(prev => `${prev} Attached: ${selectedFile.name}`);
+        
+        // Add this line:
+        e.target.value = ''; 
     }
+};
 
     const handleDelete = async () => {
         try {
@@ -149,6 +163,7 @@ const RoomPage = () => {
 
     const handleSubmit = async (e:React.FormEvent) => {
         e.preventDefault();
+        setPreviewUrl(null);
         const cleanText = text.replace(/\s*Attached: .+$/, '').trim()
         if (!cleanText.trim() && !file) return
         try {
@@ -196,7 +211,7 @@ const RoomPage = () => {
                         user.id==room?.host_id && 
                         <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <button className='text-lg cursor-pointer right-0'>x</button>
+                            <X className='ml-auto cursor-pointer' />
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                             <AlertDialogHeader>
@@ -247,9 +262,7 @@ const RoomPage = () => {
                                 user.id==message?.owner_id && 
                                 <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                    <button className='ml-auto text-[var(--primary)] cursor-pointer'>
-                                        x
-                                    </button>
+                                    <X className='ml-auto cursor-pointer' />
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
@@ -291,7 +304,10 @@ const RoomPage = () => {
                     <button type="button" className="absolute right-8 top-2 cursor-pointer" onClick={handleFileClick}>
                     <FaPaperclip />
                     </button>
-                    <input type="file" accept="application/pdf"  ref={fileInputRef}
+                    <input 
+                    type="file" 
+                    accept="application/pdf, image/*" // Allows PDFs and any image type
+                    ref={fileInputRef}
                     onChange={handleFileChange}
                     className="hidden"
                     />

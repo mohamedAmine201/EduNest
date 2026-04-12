@@ -16,7 +16,7 @@ class Room(models.Model):
 class Message(models.Model):
     owner = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, related_name='messages')
     room = models.ForeignKey('rooms.Room', on_delete=models.CASCADE, null=True, related_name='messages')
-    body = models.CharField(max_length=200)
+    body = models.CharField(max_length=200, blank=True, null=True)
     created = models.DateField(auto_now_add=True)
     attachment = models.FileField(
         upload_to='messaes_attachment/',

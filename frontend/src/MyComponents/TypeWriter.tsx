@@ -1,43 +1,56 @@
 import React, { useState, useEffect } from "react";
 
 interface TypewriterProps {
-    text: string;
-    speed?: number;   // typing speed in ms
-    pause?: number;   // pause before switching direction in ms
-    }
+  words: string[];
+  speed?: number; 
+  pause?: number;
+}
 
-    const Typewriter: React.FC<TypewriterProps> = ({ text, speed = 100, pause = 800 }) => {
-    const [index, setIndex] = useState<number>(0);
-    const [typing, setTyping] = useState<boolean>(true);
+const Typewriter: React.FC<TypewriterProps> = ({ 
+  words, 
+  speed = 100, 
+  pause = 1200 
+}) => {
+  const [wordIndex, setWordIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-    useEffect(() => {
-        let timer: ReturnType<typeof setTimeout>;
+  useEffect(() => {
+    const currentWord = words[wordIndex];
 
-        if (typing) {
-        if (index < text.length) {
-            timer = setTimeout(() => setIndex(index + 1), speed);
+    const handleTyping = () => {
+      if (!isDeleting) {
+        // Typing forward
+        if (charIndex < currentWord.length) {
+          setCharIndex((prev) => prev + 1);
         } else {
-            timer = setTimeout(() => setTyping(false), pause);
+          // Pause at the end of the word
+          setTimeout(() => setIsDeleting(true), pause);
         }
+      } else {
+        // Deleting backward
+        if (charIndex > 0) {
+          setCharIndex((prev) => prev - 1);
         } else {
-        if (index > 0) {
-            timer = setTimeout(() => setIndex(index - 1), speed);
-        } else {
-            timer = setTimeout(() => setTyping(true), pause);
+          // Move to next word in the list
+          setIsDeleting(false);
+          setWordIndex((prev) => (prev + 1) % words.length);
         }
-        }
+      }
+    };
 
-        return () => clearTimeout(timer);
-    }, [index, typing, text, speed, pause]);
+    // Make deleting slightly faster for a snappier feel
+    const delta = isDeleting ? speed / 2 : speed;
+    const timer = setTimeout(handleTyping, delta);
 
-    // derive displayed text directly from index
-    const displayed = text.substring(0, index);
+    return () => clearTimeout(timer);
+  }, [charIndex, isDeleting, wordIndex, words, speed, pause]);
 
-    return (
-        <span className="text-[var(--primary)] border-r-4 border-current animate-pulse">
-        {displayed}
-        </span>
-    );
+  return (
+    <span className="text-[var(--primary)] border-r-4 border-current animate-pulse min-h-[1em]">
+      {words[wordIndex].substring(0, charIndex)}
+    </span>
+  );
 };
 
 export default Typewriter;

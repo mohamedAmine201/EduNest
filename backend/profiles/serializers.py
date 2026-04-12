@@ -27,20 +27,22 @@ class TeacherSerializer(serializers.ModelSerializer):
     prenom = serializers.CharField(source='user.first_name')
     email  = serializers.EmailField(source='user.email')
     user_id    = serializers.IntegerField(source='user.id')
+    phone_number = serializers.CharField(source='user.phone_number')
 
     class Meta:
         model  = TeacherProfile
-        fields = ['id', 'nom', 'prenom', 'email', 'user_id']
+        fields = ['id', 'nom', 'prenom', 'email', 'user_id', 'phone_number']
 
 
 class HeadSerializer(serializers.ModelSerializer):
     nom    = serializers.CharField(source='user.last_name')
     prenom = serializers.CharField(source='user.first_name')
     email  = serializers.EmailField(source='user.email')
+    phone_number = serializers.CharField(source='user.phone_number')
 
     class Meta:
         model  = HeadProfile
-        fields = ['id', 'nom', 'prenom', 'email']
+        fields = ['id', 'nom', 'prenom', 'email', 'phone_number']
 
 class TeacherInCourseSerializer(serializers.ModelSerializer):
     nom    = serializers.CharField(source='user.last_name')

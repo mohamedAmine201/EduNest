@@ -7,6 +7,7 @@ urlpatterns = [
     path('<int:pk>/', views.CourseDetailAPIView.as_view(), name='course-detail'),
 
     path('<int:course_id>/evaluations/', views.EvaluationListCreateView.as_view()),
+    path('<int:course_id>/students/<int:student_id>/grades/', views.StudentGradesUpdateView.as_view()),
 
     path('<int:course_id>/grades/upload/', views.GradeUploadPreviewAPIView.as_view()),
     path('<int:course_id>/grades/confirm/', views.GradeConfirmAPIView.as_view()),

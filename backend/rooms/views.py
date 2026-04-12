@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from .models import Room, Message
 from .serializers import RoomSerializer, MessageSerializer
 from .permissions import IsTeacherOrHead
+from rest_framework.parsers import MultiPartParser, FormParser
 
 def get_rooms_for_user(user):
     if user.role == 'STUDENT':
@@ -52,6 +53,7 @@ class RoomCountAPIView(APIView):
 
 
 class MessageCreateAPIView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
     def post(self, request, room_id, *args, **kwargs):
         room = get_object_or_404(Room, id=room_id)
         serializer = MessageSerializer(data=request.data)

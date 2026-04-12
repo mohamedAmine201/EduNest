@@ -24,6 +24,12 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = ['id', 'room', 'room_id', 'owner', 'owner_id', 'body', 'attachment', 'created']
 
     def validate_attachment(self, value):
-        if value and not value.name.endswith('.pdf'):
-            raise serializers.ValidationError("Only pdf files are allowed")
+        if value and hasattr(value, 'name'):
+            valid_extensions = ['.pdf', '.jpg', '.jpeg', '.png', '.webp']
+            extension = value.name.lower()[value.name.rfind('.'):] # Extracts extension
+            
+            if extension not in valid_extensions:
+                raise serializers.ValidationError(
+                    f"Unsupported file type. Allowed: {', '.join(valid_extensions)}"
+                )
         return value

@@ -1,7 +1,24 @@
 <!doctype html>
-<html class="dark" lang="en">
-  <head>
+<html lang="en"> <head>
     <meta charset="UTF-8" />
+    <script>
+      // Run this immediately to prevent Flash of Unstyled Content (FOUC)
+      (function() {
+        try {
+          const savedTheme = localStorage.getItem('theme');
+          const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+          
+          if (savedTheme === 'dark' || (!savedTheme && supportDarkMode)) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {
+          // Fallback for private browsing/disabled localStorage
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="./src/assets/logoIEC.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EduNest</title>

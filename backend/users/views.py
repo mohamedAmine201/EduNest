@@ -110,6 +110,7 @@ class LoginView(APIView):
                         'role': user.role,
                         'bio': user.bio,
                         'profile_pic': request.build_absolute_uri(user.profile_pic.url) if user.profile_pic  else None,
+                        'phone_number': user.phone_number
                     }
                 }, status=status.HTTP_200_OK)
             return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
@@ -281,7 +282,7 @@ class BulkImportView(APIView):
     def post(self, request):
         mapping       = request.data.get("mapping", {})
         rows          = request.data.get("rows", [])
-        role          = request.data.get("role", "").upper()       # "STUDENT" or "TEACHER"
+        role          = request.data.get("role", "").upper()
         speciality    = request.data.get("speciality") or None
         current_year  = request.data.get("current_year") or None
         year = request.data.get("year") or None
@@ -293,6 +294,8 @@ class BulkImportView(APIView):
                 identifier = row.get(mapping.get("identifier"))
                 nom        = row.get(mapping.get("nom"))
                 prenom     = row.get(mapping.get("prenom"))
+                clean_first = prenom.strip().replace(" ", "_").lower()
+                clean_last  = nom.strip().replace(" ", "_").lower()
                 email      = row.get(mapping.get("email"))
                 phone      = row.get(mapping.get("phone_number")) if mapping.get("phone_number") else None
                 course     = row.get(mapping.get("course")) if mapping.get("course") else None
@@ -313,7 +316,7 @@ class BulkImportView(APIView):
                         return Response({"detail": "Speciality/year not found"}, status=404)
 
                     user = User.objects.create_user(
-                    username=email,
+                    username=f"{clean_first}.{clean_last}",
                     first_name=prenom,
                     last_name=nom,
                     email=email,
@@ -330,7 +333,7 @@ class BulkImportView(APIView):
                 elif role == "TEACHER":
                     password = current_year
                     user = User.objects.create_user(
-                    username=email,
+                    username=f"{clean_first}.{clean_last}",
                     first_name=prenom,
                     last_name=nom,
                     email=email,

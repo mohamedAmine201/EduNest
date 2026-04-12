@@ -15,6 +15,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ReferenceLine, ResponsiveContainer, Cell
 } from 'recharts'
+import EditGradeForm from './EditGradeForm'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -510,7 +511,6 @@ function GradeBarChart({ students, evaluations, grades, finals }: GradeBarChartP
 
   return (
     <div className="space-y-4">
-      {/* Target picker */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs font-medium text-zinc-500 mr-1">Show:</span>
         {evaluations.map(ev => (
@@ -539,7 +539,6 @@ function GradeBarChart({ students, evaluations, grades, finals }: GradeBarChartP
         </button>
       </div>
 
-      {/* Stats strip */}
       {chartData.length > 0 && avg !== null && (
         <div className="flex gap-4 flex-wrap text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-2.5">
           <span><span className="font-medium text-zinc-700">Showing:</span> {targetLabel}</span>
@@ -559,7 +558,6 @@ function GradeBarChart({ students, evaluations, grades, finals }: GradeBarChartP
         </div>
       )}
 
-      {/* Chart */}
       {chartData.length === 0 ? (
         <div className="flex items-center justify-center h-64 bg-zinc-50 border border-dashed border-zinc-300 rounded-xl text-sm text-zinc-400">
           No grades recorded for {targetLabel} yet.
@@ -584,8 +582,6 @@ function GradeBarChart({ students, evaluations, grades, finals }: GradeBarChartP
                 width={28}
               />
               <Tooltip content={<CustomBarTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-
-              {/* Pass/fail line */}
               <ReferenceLine
                 y={10}
                 stroke="black"
@@ -593,8 +589,6 @@ function GradeBarChart({ students, evaluations, grades, finals }: GradeBarChartP
                 strokeWidth={1}
                 label={{ value: 'pass', position: 'insideTopRight', fontSize: 10, fill: 'black' }}
               />
-
-              {/* Average dashed line */}
               {avg !== null && (
                 <ReferenceLine
                   y={avg}
@@ -610,7 +604,6 @@ function GradeBarChart({ students, evaluations, grades, finals }: GradeBarChartP
                   }}
                 />
               )}
-
               <Bar dataKey="grade" radius={[4, 4, 0, 0]} isAnimationActive={true}>
                 {chartData.map((entry, index) => (
                   <Cell key={index} fill={barColor(entry.grade)} fillOpacity={0.85} />
@@ -619,7 +612,6 @@ function GradeBarChart({ students, evaluations, grades, finals }: GradeBarChartP
             </BarChart>
           </ResponsiveContainer>
 
-          {/* Legend */}
           <div className="flex items-center gap-4 justify-center mt-2 text-xs text-zinc-500">
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> ≥ 16</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" /> 12 – 15</span>
@@ -647,6 +639,10 @@ const TeacherProfile = () => {
   const [showCreateEval, setShowCreateEval] = useState(false)
   const [finals, setFinals] = useState<FinalsMap>({})
   const [view, setView] = useState<'table' | 'graph'>('table')
+
+  // ── NEW: selected student for grade editing ──
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null)
+
   const { token } = useAuth()
 
   const fetchGrades = async (course: Course) => {
@@ -687,6 +683,7 @@ const TeacherProfile = () => {
   const handleSelectCourse = (course: Course) => {
     setSelectedCourse(course)
     setGrades({})
+    setEditingStudent(null)
     fetchGrades(course)
   }
 
@@ -702,6 +699,11 @@ const TeacherProfile = () => {
 
   const handleImportSuccess = () => {
     setShowImport(false)
+    if (selectedCourse) fetchGrades(selectedCourse)
+  }
+
+  // ── NEW: called by EditGradeForm after a successful save ──
+  const handleGradeSaved = () => {
     if (selectedCourse) fetchGrades(selectedCourse)
   }
 
@@ -874,61 +876,84 @@ const TeacherProfile = () => {
 
           {/* ── TABLE VIEW ── */}
           {view === 'table' && (
-            <Table>
-              <TableCaption>{selectedCourse.name} — grade sheet</TableCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Prénom</TableHead>
-                  {evaluations.map(ev => (
-                    <TableHead key={ev.id}>
-                      <div className="flex flex-col gap-0.5">
-                        <span>{ev.name}</span>
-                        <span className="text-[10px] font-normal text-zinc-400">{(ev.weight * 100).toFixed(0)}%</span>
-                      </div>
-                    </TableHead>
-                  ))}
-                  <TableHead className="text-right">Average</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.length === 0 ? (
+            <>
+              {evaluations.length > 0 && students.length > 0 && (
+                <p className="text-xs text-zinc-400 flex items-center gap-1">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  Click a student row to edit their grades.
+                </p>
+              )}
+              <Table>
+                <TableCaption>{selectedCourse.name} — grade sheet</TableCaption>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={evaluations.length + 3} className="text-center text-zinc-400 py-8">
-                      No students enrolled yet.
-                    </TableCell>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Prénom</TableHead>
+                    {evaluations.map(ev => (
+                      <TableHead key={ev.id}>
+                        <div className="flex flex-col gap-0.5">
+                          <span>{ev.name}</span>
+                          <span className="text-[10px] font-normal text-zinc-400">{(ev.weight * 100).toFixed(0)}%</span>
+                        </div>
+                      </TableHead>
+                    ))}
+                    <TableHead className="text-right">Average</TableHead>
                   </TableRow>
-                ) : (
-                  students.map(student => (
-                    <TableRow key={student.id}>
-                      <TableCell>{student.last_name}</TableCell>
-                      <TableCell>{student.first_name}</TableCell>
-                      {evaluations.map(ev => {
-                        const grade = grades[student.id]?.[ev.name]
-                        return (
-                          <TableCell key={ev.id} className="text-sm">
-                            {grade !== null && grade !== undefined
-                              ? <span className="font-medium">{grade}</span>
-                              : <span className="text-zinc-400">—</span>}
-                          </TableCell>
-                        )
-                      })}
-                      <TableCell className="text-right font-medium text-sm">
-                        {finals[student.id] !== undefined && finals[student.id] !== null
-                          ? finals[student.id]!.toFixed(2)
-                          : '—'}
+                </TableHeader>
+                <TableBody>
+                  {students.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={evaluations.length + 3} className="text-center text-zinc-400 py-8">
+                        No students enrolled yet.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={evaluations.length + 2}>Course</TableCell>
-                  <TableCell className="text-right">{selectedCourse.name}</TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
+                  ) : (
+                    students.map(student => {
+                      const isEditing = editingStudent?.id === student.id
+                      return (
+                        <TableRow
+                          key={student.id}
+                          // ── row click opens EditGradeForm ──
+                          onClick={() => {
+                            if (evaluations.length === 0) return
+                            setEditingStudent(isEditing ? null : student)
+                          }}
+                          className={`transition-colors ${
+                            evaluations.length > 0
+                              ? 'cursor-pointer hover:bg-blue-50/60 dark:hover:bg-blue-900/20'
+                              : 'cursor-default'
+                          } ${isEditing ? 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-inset ring-blue-200' : ''}`}
+                        >
+                          <TableCell>{student.last_name}</TableCell>
+                          <TableCell>{student.first_name}</TableCell>
+                          {evaluations.map(ev => {
+                            const grade = grades[student.id]?.[ev.name]
+                            return (
+                              <TableCell key={ev.id} className="text-sm">
+                                {grade !== null && grade !== undefined
+                                  ? <span className="font-medium">{grade}</span>
+                                  : <span className="text-zinc-400">—</span>}
+                              </TableCell>
+                            )
+                          })}
+                          <TableCell className="text-right font-medium text-sm">
+                            {finals[student.id] !== undefined && finals[student.id] !== null
+                              ? finals[student.id]!.toFixed(2)
+                              : '—'}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={evaluations.length + 2}>Course</TableCell>
+                    <TableCell className="text-right">{selectedCourse.name}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </>
           )}
 
           {/* ── GRAPH VIEW ── */}
@@ -949,6 +974,7 @@ const TeacherProfile = () => {
         </>
       )}
 
+      {/* ── Modals ── */}
       {showCreateEval && selectedCourse && (
         <CreateEvaluationModal
           course={selectedCourse}
@@ -965,6 +991,19 @@ const TeacherProfile = () => {
           token={token!}
           onClose={() => setShowImport(false)}
           onSuccess={handleImportSuccess}
+        />
+      )}
+
+      {/* ── EditGradeForm side panel ── */}
+      {editingStudent && selectedCourse && (
+        <EditGradeForm
+          student={editingStudent}
+          evaluations={evaluations}
+          courseId={selectedCourse.id}
+          token={token!}
+          initialGrades={grades[editingStudent.id] ?? {}}
+          onClose={() => setEditingStudent(null)}
+          onSaved={handleGradeSaved}
         />
       )}
     </div>

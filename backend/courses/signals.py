@@ -11,3 +11,17 @@ def create_student_course_on_enrollment(sender, instance, action, pk_set, **kwar
                 student_id=student_pk,
                 course=instance
             )
+
+from .models import StudentEvaluation
+from notifications.utils import notify_user
+
+
+@receiver(post_save, sender=StudentEvaluation)
+def on_evaluation_created(sender, instance, created, **kwargs):
+    if not created:
+        return
+    notify_user(
+        user_id=instance.student.user.id,
+        message=f'A new evaluation "{instance.name}" was added for you.',
+        notif_type="evaluation",
+    )

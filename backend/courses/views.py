@@ -1,5 +1,6 @@
 from django.shortcuts import render
-from rest_framework import generics 
+from django.db import transaction
+from rest_framework import generics, status
 from rest_framework.views import APIView
 from .models import Course, StudentCourse
 from .serializers import CourseSerializer, EvaluationSerializer
@@ -131,6 +132,53 @@ class EvaluationListCreateView(generics.ListCreateAPIView):
             )
         serializer.save(course=course)
 
+
+class StudentGradesUpdateView(APIView):
+    def patch(self, request, course_id, student_id):
+        # 1. Fetch relevant objects
+        course = get_object_or_404(Course, id=course_id)
+        student = get_object_or_404(StudentProfile, id=student_id)
+        
+        # 2. Extract grades dictionary: {"Exam": 15.5, "Quiz": null}
+        grades_data = request.data.get('grades', {})
+        
+        try:
+            with transaction.atomic():
+                for eval_name, score in grades_data.items():
+                    # Find the evaluation template for this course
+                    evaluation = get_object_or_404(
+                        Evaluation, 
+                        course=course, 
+                        name=eval_name
+                    )
+                    
+                    # Update or Create the specific student's grade
+                    # If score is null, we set it to None in the DB
+                    StudentEvaluation.objects.update_or_create(
+                        student=student,
+                        evaluation=evaluation,
+                        defaults={'grade': score}
+                    )
+
+                # 3. Update the Final Grade for the course
+                # Get the link between this student and this course
+                student_course, created = StudentCourse.objects.get_or_create(
+                    student=student,
+                    course=course
+                )
+                student_course.calculate_final_grade()
+                student_course.save()
+
+            return Response({
+                "message": "Grades updated and average recalculated.",
+                "final_grade": student_course.final_grade
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 import pandas as pd
 from rest_framework.views import APIView

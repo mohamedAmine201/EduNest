@@ -75,7 +75,7 @@ import {useAuth} from './AuthContext'
             {token 
             ?<NavigationMenuItem>
                 <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-                    <Button className="text-white cursor-pointer" onClick={handleLogout}>Logout</Button>
+                    <Button className="text-black dark:text-white dark:hover:text-black cursor-pointer" onClick={handleLogout}>Logout</Button>
                 </NavigationMenuLink>
             </NavigationMenuItem>
             :
