@@ -104,107 +104,113 @@ import {
     }
 
     return (
-        <Card className="w-full sm:max-w-md">
-        <CardHeader>
-            <CardTitle>Create a Room</CardTitle>
-            <CardDescription>
-            Creat a Room to help students.
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
-            <FieldGroup>
-                <Controller
-                    name="speciality_year"
-                    control={form.control}
-                    render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                            <FieldLabel>Speciality</FieldLabel>
-                            <Select value={field.value} onValueChange={field.onChange}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select a speciality" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectGroup>
-                                        <SelectLabel>Specialities</SelectLabel>
-                                        {specialities.map((spec: any) => (
-                                            <SelectItem key={spec.id} value={String(spec.id)}>
-                                                {spec.year} - {spec.speciality}  {/* adjust field name to match your API */}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
-                            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                        </Field>
-                    )}
-                />
-                <Controller
-                name="topic"
+    <Card className="w-full max-w-md mx-auto">  {/* removed sm: prefix so it applies at all sizes */}
+    <CardHeader>
+        <CardTitle>Create a Room</CardTitle>
+        <CardDescription>
+        Create a Room to help students.
+        </CardDescription>
+    </CardHeader>
+    <CardContent>
+        <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
+        <FieldGroup>
+            <Controller
+                name="speciality_year"
                 control={form.control}
                 render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="form-rhf-demo-title">
-                        Room Topic
-                    </FieldLabel>
-                    <Input
-                        {...field}
-                        id="form-rhf-demo-title"
-                        aria-invalid={fieldState.invalid}
-                        placeholder="Room of TNS"
-                        autoComplete="off"
+                        <FieldLabel>Speciality</FieldLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select a speciality" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60 overflow-y-auto"> {/* prevents dropdown overflow on small screens */}
+                                <SelectGroup>
+                                    <SelectLabel>Specialities</SelectLabel>
+                                    {specialities.map((spec: any) => (
+                                        <SelectItem key={spec.id} value={String(spec.id)}>
+                                            {spec.year} - {spec.speciality}
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                        </Select>
+                        {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                    </Field>
+                )}
+            />
+            <Controller
+            name="topic"
+            control={form.control}
+            render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="form-rhf-demo-title">
+                    Room Topic
+                </FieldLabel>
+                <Input
+                    {...field}
+                    id="form-rhf-demo-title"
+                    aria-invalid={fieldState.invalid}
+                    placeholder="Room of TNS"
+                    autoComplete="off"
+                    className="w-full"
+                />
+                {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                )}
+                </Field>
+            )}
+            />
+            <Controller
+            name="description"
+            control={form.control}
+            render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="form-rhf-demo-description">
+                    Description
+                </FieldLabel>
+                <InputGroup className="w-full">
+                    <InputGroupTextarea
+                    {...field}
+                    id="form-rhf-demo-description"
+                    placeholder="Correction d'examen de premier semestre"
+                    rows={6}
+                    className="w-full min-h-24 resize-none"  
+                    aria-invalid={fieldState.invalid}
                     />
-                    {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                    )}
-                    </Field>
+                    <InputGroupAddon align="block-end">
+                    <InputGroupText className="tabular-nums">
+                        {field.value.length}/100 characters
+                    </InputGroupText>
+                    </InputGroupAddon>
+                </InputGroup>
+                <FieldDescription>
+                    Include useful information about the Exam or Interrogation.
+                </FieldDescription>
+                {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
                 )}
-                />
-                <Controller
-                name="description"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="form-rhf-demo-description">
-                        Description
-                    </FieldLabel>
-                    <InputGroup>
-                        <InputGroupTextarea
-                        {...field}
-                        id="form-rhf-demo-description"
-                        placeholder="Correction d'examen de premier semestre"
-                        rows={6}
-                        className="min-h-24 resize-none"
-                        aria-invalid={fieldState.invalid}
-                        />
-                        <InputGroupAddon align="block-end">
-                        <InputGroupText className="tabular-nums">
-                            {field.value.length}/100 characters
-                        </InputGroupText>
-                        </InputGroupAddon>
-                    </InputGroup>
-                    <FieldDescription>
-                        Include useful information about the Exam or Interrogation.
-                    </FieldDescription>
-                    {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                    )}
-                    </Field>
-                )}
-                />
-            </FieldGroup>
-            </form>
-        </CardContent>
-        <CardFooter>
-            <Field orientation="horizontal">
-            <Button type="button" variant="outline" onClick={() => form.reset()}>
-                Reset
-            </Button>
-            <Button type="submit" form="form-rhf-demo">
-                Submit
-            </Button>
-            </Field>
-        </CardFooter>
-        </Card>
-    )
+                </Field>
+            )}
+            />
+        </FieldGroup>
+        </form>
+    </CardContent>
+    <CardFooter>
+    <Field orientation="horizontal" className="w-full justify-end gap-2">
+        <Button type="button" variant="outline" onClick={() => form.reset()}>
+        Reset
+        </Button>
+        {onClose && (
+        <Button type="button" variant="outline" onClick={onClose}>
+            Close
+        </Button>
+        )}
+        <Button type="submit" form="form-rhf-demo">
+        Submit
+        </Button>
+    </Field>
+    </CardFooter>
+    </Card>
+)
 }

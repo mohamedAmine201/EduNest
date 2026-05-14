@@ -49,7 +49,7 @@ const BASE_URL = import.meta.env.VITE_API_URL
         }
     }
     return (
-        <Card className="w-full max-w-sm">
+        <Card className="w-full max-w-sm mt-4">
         <CardHeader>
             <CardTitle>Login to your account</CardTitle>
             <CardDescription>

@@ -4,6 +4,7 @@ import {Link} from 'react-router-dom'
 import {FaFacebook, FaInstagram, FaLinkedin} from 'react-icons/fa'
 import Typewriter from '@/MyComponents/TypeWriter'
 import AuroraBg from '@/MyComponents/AuroraBg'
+import { Button } from '@/components/ui/button'
 
 const clubLanguages = [
   "CLUB.",    // English
@@ -16,18 +17,18 @@ const clubLanguages = [
 
 const HomePage = () => {
   return (
-    <div className='flex justify-between items-center py-2 px-4 w-[85%] mt-20 mx-auto'>
+    <div className='flex justify-between items-center py-2 px-4 w-full md:w-[85%] mt-10 md:mt-20  mx-auto'>
       <AuroraBg />
       <div
-        className="relative z-10 flex flex-col justify-center items-start w-[85%] mx-auto"
+        className="relative z-10 flex flex-col justify-center items-start w-full md:w-[85%]  h-full mx-auto "
       >
-        <h2 className='text-5xl text-[var(--primary)] font-bold tracking-wide'>
+        <h2 className='text-4xl md:text-5xl text-[var(--primary)] font-bold tracking-wide'>
           INDUSTRIAL
         </h2>
-        <h2 className='text-5xl mt-2 font-bold tracking-wide'>
+        <h2 className='text-3xl md:text-5xl mt-2 font-bold tracking-wide'>
           ENGINEERS <Typewriter words={clubLanguages} speed={150} pause={1500} />
         </h2>
-        <p className='text-lg w-[50%] mt-6 text-[var(--muted-foreground)]'>
+        <p className='text-sm w-[90%] md:text-lg md:w-[50%] mt-6 text-[var(--muted-foreground)]'>
           Plus qu'un club. "Industrial Engineers Club" est un club du Génie Industriel.
         </p>
         <div className='flex items-center gap-5 mt-8'>
@@ -41,6 +42,12 @@ const HomePage = () => {
             <FaLinkedin size={22} />
           </Link>
         </div>
+        <Link to="rooms/">
+          <Button size="lg" className='mt-10 px-8 py-3 mx-auto md:mx-0 text-base font-semibold tracking-wide'>
+            Explore Your Space
+          </Button>
+        </Link>
+        
       </div>
     </div>
   )

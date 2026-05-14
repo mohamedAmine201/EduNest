@@ -1,7 +1,11 @@
+from django.http import JsonResponse
 from django.urls import path
 from . import views  
 
 urlpatterns = [
+        # urls.py
+    path('api/health/', lambda request: JsonResponse({'status': 'ok'})),
+
     path('register/', views.RegisterView.as_view(), name='register'),
     path('login/', views.LoginView.as_view(), name='login'),
 

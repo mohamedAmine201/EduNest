@@ -530,10 +530,10 @@ const HeadProfile = () => {
 
         {/* Actions */}
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport} className="flex items-center gap-2 text-sm">
+          <Button variant="outline" onClick={handleExport} className="hidden md:flex items-center gap-2 text-sm">
             <Download className="w-4 h-4" /> Export
           </Button>
-          <Button variant="outline" onClick={() => setShowImport(true)} className="flex items-center gap-2 text-sm" disabled={!canImport}>
+          <Button variant="outline" onClick={() => setShowImport(true)} className="hidden md:flex items-center gap-2 text-sm" disabled={!canImport}>
             <Upload className="w-4 h-4" /> Import
           </Button>
           <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2 text-sm">

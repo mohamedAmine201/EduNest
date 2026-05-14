@@ -1,8 +1,0 @@
-.env
-.env.local
-.*pem
-__pycache__/
-*.pyc
-db.sqlite3
-node_modules/
-dist/

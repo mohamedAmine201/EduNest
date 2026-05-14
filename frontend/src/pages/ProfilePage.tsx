@@ -196,7 +196,7 @@ const ProfilePage = () => {
 
   return (
     <div className="w-[85%] mx-auto py-10">
-      <div className="relative w-[50%] flex items-center mx-auto mb-4 gap-2">
+      <div className="relative md:w-[50%] flex items-center mx-auto mb-4 gap-2">
         {/* The X button to the left (Optional, but good for UX) */}
         {(query || selectedProfile) && (
           <button 

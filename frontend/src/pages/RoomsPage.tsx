@@ -82,30 +82,21 @@ const RoomsPage = () => {
                     </Button>
                     </div>}
             </div>
+            
             {showForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center">
                 {/* Overlay */}
                 <div
                 className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                 onClick={() => setShowForm(false)}
-                ></div>
+                />
 
                 {/* Modal */}
-                <div className="relative z-10 w-full max-w-lg mx-4 rounded-lg shadow-lg p-6">
-                <Button
-                    className="mb-4 self-end"
-                    variant="outline"
-                    onClick={() => setShowForm(false)}
-                >
-                    Close
-                </Button>
-
-                <CreateRoomForm onClose={() => setShowForm(false)}/>
+                <div className="relative z-10 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto rounded-lg shadow-lg">
+                <CreateRoomForm onClose={() => setShowForm(false)} />
                 </div>
             </div>
             )}
-
-
 
             <h2 className='text-lg font-bold my-4'>All Rooms</h2>
             <div className='flex flex-col justify-center items-center gap-4'>

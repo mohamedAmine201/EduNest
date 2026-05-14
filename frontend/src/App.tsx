@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { createBrowserRouter, RouterProvider } from "react-router-dom"
 import MainLayout from "./Layouts/MainLayout"
 import HomePage from "./pages/HomePage"
@@ -13,7 +14,13 @@ import TeacherProfile from "./MyComponents/TeacherProfile"
 import StudentProfile from "./MyComponents/StudentProfile"
 
 
+
+
 function App() {
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL}/api/users/health/`) 
+      .catch(() => {})
+  }, [])
   const {user} = useAuth();
   const router = createBrowserRouter([
   {
